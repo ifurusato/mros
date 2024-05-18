@@ -70,7 +70,7 @@ Status
 ******
 
 Early days. The Phase 0 hardware is largely complete and migration and conversion
-of the `KROS-Core https://github.com/ifurusato/kros-core/tree/main`_ is being used
+of the `KROS-Core <https://github.com/ifurusato/kros-core/tree/main>`_ is being used
 as the basis of MROS.
 
 .. note::
