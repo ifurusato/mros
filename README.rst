@@ -2,7 +2,7 @@
 MROS: Operating System for the MR01 Mars Rover
 **********************************************
 
-**MROS** provides the core functionality of the *MR01 Mars Rover*, a Raspberry 
+**MROS** provides the core functionality of the *MR01 Mars Rover*, a Raspberry
 Pi-based robot OS written in Python 3.
 
 .. figure:: https://service.robots.org.nz/wiki/attach/MR01/MR01-2024-05-18.png
@@ -13,11 +13,12 @@ Pi-based robot OS written in Python 3.
 
    A 3D model of the MR01 Robot.
 
+|
 
-
-The *mros* library provides essential support designed as the basis of a
+The *MROS* library provides essential support designed as the basis of a
 `Behaviour-Based Systems (BBS) <https://en.wikipedia.org/wiki/Behavior-based_robotics>`_.
-This library is relatively "low-level" and could be used for any Python 3 based robot.
+This library is relatively "low-level" and, in theory, could be used for any Python 3 
+based robot.
 
 The basic function is for sensors to act as "Publishers" in a "Publish-Subscribe" model,
 firing event-laden messages onto an asynchronous message bus. Subscribers to the bus can
@@ -69,10 +70,11 @@ Status
 ******
 
 Early days. The Phase 0 hardware is largely complete and migration and conversion
-of the `KROS-Core https://github.com/ifurusato/kros-core/tree/main`_ is being used 
+of the `KROS-Core https://github.com/ifurusato/kros-core/tree/main`_ is being used
 as the basis of MROS.
 
 .. note::
+
    This project is currently in a very preliminary state.
 
    The project is being exposed publicly so that those interested can follow its progress.
