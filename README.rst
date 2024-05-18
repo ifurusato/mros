@@ -90,7 +90,7 @@ your own risk.
 Copyright & License
 *******************
 
-All contents (including software, documentation and images) Copyright 2020-2021
+All contents (including software, documentation and images) Copyright 2020-2024
 by Murray Altheim. All rights reserved.
 
 Software and documentation are distributed under the MIT License, see LICENSE

@@ -179,10 +179,10 @@ class ComponentRegistry(object):
         Add a component to the registry using a unique name.
         '''
         if name in self._dict:
-            self._log.warning('🐰 component \'{}\' already in registry.'.format(name))
+            self._log.warning('component \'{}\' already in registry.'.format(name))
         else:
             self._dict[name] = component
-            self._log.info('🐰 added component \'{}\' to registry ({:d} total).'.format(name, len(self._dict)))
+            self._log.info('added component \'{}\' to registry ({:d} total).'.format(name, len(self._dict)))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def print_registry(self):

@@ -1,0 +1,49 @@
+#
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
+# of the Robot Operating System project, released under the MIT License. Please
+# see the LICENSE file included as part of this package.
+#
+# author:   Murray Altheim
+# created:  2020-08-01
+# modified: 2024-04-09
+#
+# This mrosd service configuration file should be copied to:
+#
+#  /lib/systemd/system/
+#
+# After copying the file you'll need to reload all daemons:
+#
+#  % sudo systemctl daemon-reload
+#
+# and to enable its use upon each startup:
+#
+#  % sudo systemctl enable mrosd
+#
+# You can then use it like service, e.g.,
+#
+#  % sudo systemctl status mrosd
+#  % sudo systemctl start mrosd
+#  % sudo systemctl stop mrosd
+#
+# This requires use of the python-daemon library, which can be installed via:
+#
+#  % sudo pip3 install python-daemon
+#
+# See: https://medium.com/@Tankado95/how-to-run-a-python-code-as-a-service-using-systemctl-4f6ad1835bf2
+# See: https://www.freedesktop.org/software/systemd/man/systemd.service.html
+# ..............................................................................
+
+[Unit]
+Description=MROS Daemon Service
+After=multi-user.target
+
+[Service]
+WorkingDirectory=/home/pi/mros
+User=pi
+Type=simple
+ExecStart=/usr/bin/python3 /home/pi/mros/mrosd.py &> /dev/null
+Restart=on-success
+#PidFile=/home/pi/ros/.mrosd.pid
+
+[Install]
+WantedBy=multi-user.target
