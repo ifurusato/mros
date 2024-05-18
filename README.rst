@@ -13,6 +13,8 @@ Pi-based robot OS written in Python 3.
 
    A 3D model of the MR01 Robot.
 
+
+
 The *mros* library provides essential support designed as the basis of a
 `Behaviour-Based Systems (BBS) <https://en.wikipedia.org/wiki/Behavior-based_robotics>`_.
 This library is relatively "low-level" and could be used for any Python 3 based robot.
@@ -66,10 +68,14 @@ which should be automatically installed via pip3 when you installed kros-core::
 Status
 ******
 
-This project is currently in a very preliminary state.
+Early days. The Phase 0 hardware is largely complete and migration and conversion
+of the `KROS-Core https://github.com/ifurusato/kros-core/tree/main`_ is being used 
+as the basis of MROS.
 
-The project is being exposed publicly so that those interested can follow its
-progress.
+.. note::
+   This project is currently in a very preliminary state.
+
+   The project is being exposed publicly so that those interested can follow its progress.
 
 
 Support & Liability
