@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -21,8 +21,6 @@ from math import isclose
 from colorama import init, Fore, Style
 init()
 
-from core.message_bus import MessageBus
-from core.message_factory import MessageFactory
 from core.orientation import Orientation
 from core.rate import Rate
 from core.logger import Logger, Level
@@ -34,6 +32,11 @@ from hardware.digital_pot import DigitalPotentiometer
 
 _log = Logger('test', Level.INFO)
 
+IN_MIN  = 0.0    # minimum analog value from IO Expander
+IN_MAX  = 3.3    # maximum analog value from IO Expander
+OUT_MIN = -80.0  # minimum scaled output value
+OUT_MAX =  80.0  # maximum scaled output value
+
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def key_callback(event):
     _log.info('callback on event: {}'.format(event))
@@ -42,15 +45,15 @@ def key_callback(event):
 @pytest.mark.unit
 def test_motors():
 
-    _pfor_motor_enabled = False
-    _sfor_motor_enabled = False
+    _pfwd_motor_enabled = True
+    _sfwd_motor_enabled = True
     _pmid_motor_enabled = False
     _smid_motor_enabled = False
     _paft_motor_enabled = True
-    _saft_motor_enabled = False
+    _saft_motor_enabled = True
 
-    _pfor_motor = None
-    _sfor_motor = None
+    _pfwd_motor = None
+    _sfwd_motor = None
     _pmid_motor = None
     _smid_motor = None
     _paft_motor = None
@@ -62,26 +65,19 @@ def test_motors():
 
         # read YAML configuration
         _level = Level.INFO
-        _loader = ConfigLoader(_level)
-        filename = 'config.yaml'
-        _config = _loader.configure(filename)
-
-        _log.info('creating message bus…')
-        _message_bus = MessageBus(_config, _level)
-        _log.info('creating message factory…')
-        _message_factory = MessageFactory(_message_bus, _level)
+        _config = ConfigLoader(Level.INFO).configure() 
 
         _i2c_scanner = I2CScanner(_config, _level)
 
         # add motor controller
-        _motor_configurer = MotorConfigurer(_config, _message_bus, _i2c_scanner, motors_enabled=True, level=_level)
+        _motor_configurer = MotorConfigurer(_config, _i2c_scanner, motors_enabled=True, level=_level)
 
-        if _pfor_motor_enabled:
-            _pfor_motor = _motor_configurer.get_motor(Orientation.PFOR)
-            _pfor_motor.enable()
-        if _sfor_motor_enabled:
-            _sfor_motor = _motor_configurer.get_motor(Orientation.SFOR)
-            _sfor_motor.enable()
+        if _pfwd_motor_enabled:
+            _pfwd_motor = _motor_configurer.get_motor(Orientation.PFWD)
+            _pfwd_motor.enable()
+        if _sfwd_motor_enabled:
+            _sfwd_motor = _motor_configurer.get_motor(Orientation.SFWD)
+            _sfwd_motor.enable()
         if _pmid_motor_enabled:
             _pmid_motor = _motor_configurer.get_motor(Orientation.PMID)
             _pmid_motor.enable()
@@ -95,24 +91,45 @@ def test_motors():
             _saft_motor = _motor_configurer.get_motor(Orientation.SAFT)
             _saft_motor.enable()
 
+        # report on each motor's ThunderBorg:
+        if _pfwd_motor_enabled:
+            _i2cAddress = _pfwd_motor.tb.I2cAddress
+            _log.info(Fore.RED   + 'PFWD I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+        if _sfwd_motor_enabled:
+            _i2cAddress = _sfwd_motor.tb.I2cAddress
+            _log.info(Fore.GREEN + 'SFWD I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+        if _pmid_motor_enabled:
+            _i2cAddress = _pmid_motor.tb.I2cAddress
+            _log.info(Fore.RED   + 'PMID I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+        if _smid_motor_enabled:
+            _i2cAddress = _smid_motor.tb.I2cAddress
+            _log.info(Fore.GREEN + 'SMID I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+        if _paft_motor_enabled:
+            _i2cAddress = _paft_motor.tb.I2cAddress
+            _log.info(Fore.RED   + 'PAFT I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+        if _saft_motor_enabled:
+            _i2cAddress = _saft_motor.tb.I2cAddress
+            _log.info(Fore.GREEN + 'SAFT I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+
         if _i2c_scanner.has_hex_address(['0x0E']):
             _log.info('using digital potentiometer…')
             # configure digital potentiometer for motor speed
-            _pot = DigitalPotentiometer(_config, level=_level)
+            _pot = DigitalPotentiometer(_config, 0x0E, level=_level)
+            _pot.set_input_range(IN_MIN, IN_MAX)
+            _pot.set_output_range(OUT_MIN, OUT_MAX)
         else:
             raise Exception('cannot continue: no digital potentiometer found.')
 
-#       sys.exit(0)
         _last_scaled_value = 0.0
         _log.info('starting test…')
         _hz = 20
         _rate = Rate(_hz, Level.ERROR)
         while True:
 
-            if _pfor_motor_enabled:
-                _pfor_motor.update_target_velocity()
-            if _sfor_motor_enabled:
-                _sfor_motor.update_target_velocity()
+            if _pfwd_motor_enabled:
+                _pfwd_motor.update_target_velocity()
+            if _sfwd_motor_enabled:
+                _sfwd_motor.update_target_velocity()
             if _pmid_motor_enabled:
                 _pmid_motor.update_target_velocity()
             if _smid_motor_enabled:
@@ -127,10 +144,10 @@ def test_motors():
                 # math.isclose(3, 15, abs_tol=0.03 * 255) # 3% on a 0-255 scale
                 if isclose(_scaled_value, 0.0, abs_tol=0.05 * 90):
                     _pot.set_black()
-                    if _pfor_motor_enabled:
-                        _pfor_motor.target_velocity = 0.0
-                    if _sfor_motor_enabled:
-                        _sfor_motor.target_velocity = 0.0
+                    if _pfwd_motor_enabled:
+                        _pfwd_motor.target_velocity = 0.0
+                    if _sfwd_motor_enabled:
+                        _sfwd_motor.target_velocity = 0.0
                     if _pmid_motor_enabled:
                         _pmid_motor.target_velocity = 0.0
                     if _smid_motor_enabled:
@@ -141,10 +158,10 @@ def test_motors():
                         _saft_motor.target_velocity = 0.0
                 else:
                     _pot.set_rgb(_pot.value)
-                    if _pfor_motor_enabled:
-                        _pfor_motor.target_velocity = _scaled_value
-                    if _sfor_motor_enabled:
-                        _sfor_motor.target_velocity = _scaled_value
+                    if _pfwd_motor_enabled:
+                        _pfwd_motor.target_velocity = _scaled_value
+                    if _sfwd_motor_enabled:
+                        _sfwd_motor.target_velocity = _scaled_value
                     if _pmid_motor_enabled:
                         _pmid_motor.target_velocity = _scaled_value
                     if _smid_motor_enabled:
@@ -161,12 +178,12 @@ def test_motors():
     except DeviceNotFound as e:
         _log.error('no potentiometer found, exiting.')
     except Exception as e:
-        _log.error('{} encountered, exiting: {}'.format(type(e), e))
+        _log.error('{} encountered, exiting: {}\n{}'.format(type(e), e, traceback.format_exc()))
     finally:
-        if _pfor_motor != None:
-            _pfor_motor.set_motor_power(0.0)
-        if _sfor_motor != None:
-            _sfor_motor.set_motor_power(0.0)
+        if _pfwd_motor != None:
+            _pfwd_motor.set_motor_power(0.0)
+        if _sfwd_motor != None:
+            _sfwd_motor.set_motor_power(0.0)
         if _pmid_motor != None:
             _pmid_motor.set_motor_power(0.0)
         if _smid_motor != None:

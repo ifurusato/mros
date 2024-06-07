@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   altheim
 # created:  2021-09-23
-# modified: 2021-11-04
+# modified: 2024-05-19
 #
 
 import importlib
@@ -57,7 +57,7 @@ class MacroPublisher(Publisher):
         self._level             = level
         Publisher.__init__(self, MacroPublisher.CLASS_NAME, config, message_bus, message_factory, level=self._level)
         self._queue_publisher   = queue_publisher
-        _cfg = config['kros'].get('publisher').get('macro')
+        _cfg = config['mros'].get('publisher').get('macro')
         _loop_freq_hz           = _cfg.get('loop_freq_hz')
         self._loop_delay_sec = 1.0 / _loop_freq_hz
         self._log.info('loop frequency: {} Hz.'.format(_loop_freq_hz))

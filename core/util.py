@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -11,7 +11,9 @@
 #
 
 import time
+from pathlib import Path
 from datetime import datetime as dt
+import json
 from colorama import init, Fore, Style
 init()
 
@@ -49,6 +51,40 @@ class Util(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
+    def import_configuration(log, filepath):
+        '''
+        Read configuration from a JSON file.
+
+        :param logger     the logger to capture the result
+        :param filepath   the source file path
+        '''
+#       filepath = 'config.json'
+        log.info("importing configuration from file '{}'…".format(filepath))
+        with open(filepath) as data_file:
+            _config =  json.load(data_file)
+            log.info('import complete.')
+            return _config
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def export_configuration(log, config, filepath):
+        '''
+        Dump the configuration to a JSON file.
+
+        :param logger     the logger to capture the result
+        :param config     the configuration dict to be serialised to JSON
+        :param filepath   the target file path
+        '''
+        try:
+#           filepath = 'upy/config.json'
+            log.info("exporting configuration to file '{}'…".format(filepath))
+            Path(filepath).write_text(json.dumps(config, indent=4) + '\n')
+            log.info('export complete.')
+        except Exception as e:
+            log.error('{} raised exporting configuration to JSON: {}'.format(type(e), e)) 
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
     def get_formatted_value(value):
         if isinstance(value, float):
             return '{:5.2f}'.format(value)
@@ -83,6 +119,14 @@ class Util(object):
             return string
         else:
             return '{}…'.format(string[:max_length-1])
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def frange(start=0, stop=1, jump=0.1):
+        nsteps = int((stop-start)/jump)
+        dy = stop-start
+        # f(i) goes from start to stop as i goes from 0 to nsteps
+        return [start + float(i)*dy/nsteps for i in range(nsteps)]
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod

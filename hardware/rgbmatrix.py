@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -29,7 +29,6 @@ try:
         print(Fore.RED + "This script requires the psutil module. Some features will be disabled.\nInstall with: pip3 install --user psutil")
     from rgbmatrix5x5 import RGBMatrix5x5
 except ImportError:
-#   from hardware.rgbmatrix import MockRGBMatrix5x5 as RGBMatrix5x5
     print(Fore.RED + 'This script requires the rgbmatrix5x5 module. Some features will be disabled.\nInstall with: sudo pip3 install rgbmatrix5x5')
 
 from core.component import Component
@@ -37,48 +36,6 @@ from core.logger import Level, Logger
 from core.orientation import Orientation
 from core.ranger import Ranger
 from hardware.color import Color
-#from hardware.rgbmatrix import MockRGBMatrix5x5 # for testing and simulation
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-class MockRGBMatrix5x5(Component):
-    '''
-    This is a minimal mock of the Pimoroni RGB Matrix 5x5 board.
-
-    :param level:      the logging level.
-    :param address:    the I2C address (unused).
-    '''
-    def __init__(self, address=None, level=Level.INFO):
-        self._log = Logger('mock-rgb5x5', level)
-        Component.__init__(self, self._log, suppressed=False, enabled=True)
-        self._log.info('ready.')
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    @property
-    def name(self):
-        return 'mock-rgb5x5'
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def show(self):
-        pass
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_brightness(self, value):
-        pass
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_pixel(self, x, y, r, g, b, brightness=1.0):
-        self._log.debug('set pixel ({},{}): '.format(x, y)
-            + Fore.RED   + '{}'.format(r) + Fore.CYAN + ', '
-            + Fore.GREEN + '{}'.format(g) + Fore.CYAN + ', '
-            + Fore.BLUE  + '{}'.format(b) + Fore.CYAN + ')')
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_all(self, r, g, b, brightness=1.0):
-        self._log.debug('set all pixels: ('
-                + Fore.RED   + '{}'.format(r) + Fore.CYAN + ', '
-                + Fore.GREEN + '{}'.format(g) + Fore.CYAN + ', '
-                + Fore.BLUE  + '{}'.format(b) + Fore.CYAN + ')')
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class RgbMatrix(object):
@@ -98,11 +55,10 @@ class RgbMatrix(object):
     def __init__(self, enable_port=True, enable_stbd=True, level=Level.INFO):
         global enabled
         self._log = Logger("rgbmatrix", level)
-
-        self._height = 5
-        self._width  = 5
         self._has_port_rgbmatrix = False
         self._has_stbd_rgbmatrix = False
+        self._port_rgbmatrix = None
+        self._stbd_rgbmatrix = None
 
         if enable_port:
             self._port_rgbmatrix = RGBMatrix5x5(address=0x77)
@@ -111,9 +67,7 @@ class RgbMatrix(object):
             self._port_rgbmatrix.set_clear_on_exit()
             self._has_port_rgbmatrix = True
         else:
-            self._log.info('no port rgbmatrix found, using mock.')
-            self._port_rgbmatrix = MockRGBMatrix5x5(address=0x77)
-
+            self._log.debug('no port rgbmatrix found.')
         if enable_stbd:
             self._stbd_rgbmatrix = RGBMatrix5x5(address=0x74)
             self._log.info('starboard rgbmatrix at 0x74.')
@@ -121,10 +75,9 @@ class RgbMatrix(object):
             self._stbd_rgbmatrix.set_clear_on_exit()
             self._has_stbd_rgbmatrix = True
         else:
-            self._log.info('no starboard rgbmatrix found.')
-            self._stbd_rgbmatrix = MockRGBMatrix5x5(address=0x74)
+            self._log.debug('no starboard rgbmatrix found.')
 
-        self._log.info('rgbmatrix width,height: {},{}'.format(self._width, self._height))
+        self._log.info('rgbmatrix width,height: {},{}'.format(5, 5))
         self._thread_PORT = None
         self._thread_STBD = None
         self._color = Color.RED # used by _solid
@@ -138,7 +91,7 @@ class RgbMatrix(object):
         self._wipe_color = Color.WHITE # default
         # used by _cpu:
         self._max_value = 0.0 # TEMP
-        self._buf = numpy.zeros((self._width, self._height))
+        self._buf = numpy.zeros((5, 5))
         self._colors = [ Color.GREEN, Color.YELLOW_GREEN, Color.YELLOW, Color.ORANGE, Color.RED ]
         self._log.info('ready.')
 
@@ -169,6 +122,10 @@ class RgbMatrix(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):
+        '''
+        Enables/starts a thread for the target process. This does not need to
+        be called if just using the matrix directly.   
+        '''
         global enabled
         if not self._closed and not self._closing:
             if self._thread_PORT is None and self._thread_STBD is None:
@@ -227,7 +184,7 @@ class RgbMatrix(object):
         '''
         self._log.info('starting cpu...')
         i = 0
-        cpu_values = [0] * self._width
+        cpu_values = [0] * 5
         while enabled:
             try:
                 cpu_values.pop(0)
@@ -253,11 +210,8 @@ class RgbMatrix(object):
         Plot a series of values into the display buffer.
         '''
         global enabled
-        # def set_graph(self, values, low=None, high=None, brightness=1.0, x=0, y=0, width=None, height=None):
-#       x=0
-#       y=0
-        _width = self._width - 1
-        _height = self._height + 0
+        _width  = 4
+        _height = 5
         if low is None:
             low = min(values)
         if high is None:
@@ -317,8 +271,8 @@ class RgbMatrix(object):
         _spacing = 360.0 / 5.0
         _hue = 0
         while enabled:
-            for x in range(self._width):
-                for y in range(self._height):
+            for x in range(5):
+                for y in range(5):
                     _hue = int(time.time() * 100) % 360
                     offset = (x * y) / 25.0 * _spacing
                     h = ((_hue + offset) % 360) / 360.0
@@ -409,8 +363,8 @@ class RgbMatrix(object):
         self.set_color(Color.BLACK)
 #       self._set_color(rgbmatrix, Color.BLACK)
         time.sleep(0.1)
-        xra = [ [ 0, self._width, 1 ], [ self._width-1, -1, -1 ] ]
-        yra = [ [ 0, self._height, 1 ], [ self._height-1, -1, -1 ] ]
+        xra = [ [ 0, 5, 1 ], [ 4, -1, -1 ] ]
+        yra = [ [ 0, 5, 1 ], [ 4, -1, -1 ] ]
         colors = [ self._wipe_color, Color.BLACK ]
         try:
             for i in range(0,2):
@@ -582,27 +536,18 @@ class RgbMatrix(object):
         '''
         global enabled
         self._log.info('starting blinky...')
-        if self._height == self._width:
-            _delta = 0
-        else:
-            _delta = 2
-
+        _delta = 0
         while enabled:
             for i in range(3):
                 for z in list(range(1, 10)[::-1]) + list(range(1, 10)):
                     fwhm = 5.0/z
                     gauss = RgbMatrix.make_gaussian(fwhm)
                     start = time.time()
-                    for y in range(self._height):
-                        for x in range(self._width):
+                    for y in range(5):
+                        for x in range(5):
                             h = 0.5
                             s = 0.8
-                            if self._height <= self._width:
-                                v = gauss[x, y]
-#                               v = gauss[x, y + _delta]
-                            else:
-                                v = gauss[x, y]
-#                               v = gauss[x + _delta, y]
+                            v = gauss[x, y]
                             rgb = colorsys.hsv_to_rgb(h, s, v)
                             r = int(rgb[0]*255.0)
                             g = int(rgb[1]*255.0)
@@ -631,18 +576,18 @@ class RgbMatrix(object):
         g = int(64.0)
         b = int(0.0)
 #       start = time.time()
-#       for x in range(self._width):
+#       for x in range(5):
         x = 2
         _delay = 0.25
 
         while enabled:
 #           for i in range(count):
-            for y in range(0,self._height):
+            for y in range(0,5):
                 rgbmatrix5x5.clear()
                 rgbmatrix5x5.set_pixel(x, y, r, g, b)
                 rgbmatrix5x5.show()
                 time.sleep(_delay)
-            for y in range(self._height-1,0,-1):
+            for y in range(4,0,-1):
                 rgbmatrix5x5.clear()
                 rgbmatrix5x5.set_pixel(x, y, r, g, b)
                 rgbmatrix5x5.show()
@@ -655,9 +600,9 @@ class RgbMatrix(object):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def random_update(self):
         rand_hue = numpy.random.uniform(0.1, 0.9)
-        rand_mat = numpy.random.rand(self._width,self._height)
-        for y in range(self._height):
-            for x in range(self._width):
+        rand_mat = numpy.random.rand(5, 5)
+        for y in range(5):
+            for x in range(5):
 #               h = 0.1 * rand_mat[x, y]
                 h = rand_hue * rand_mat[x, y]
                 s = 0.8
@@ -682,9 +627,9 @@ class RgbMatrix(object):
 #       count = 0
         while enabled:
             rand_hue = numpy.random.uniform(0.1, 0.9)
-            rand_mat = numpy.random.rand(self._width,self._height)
-            for y in range(self._height):
-                for x in range(self._width):
+            rand_mat = numpy.random.rand(5, 5)
+            for y in range(5):
+                for x in range(5):
 #                   h = 0.1 * rand_mat[x, y]
                     h = rand_hue * rand_mat[x, y]
                     s = 0.8
@@ -710,6 +655,34 @@ class RgbMatrix(object):
             self._set_color(self._port_rgbmatrix, color, show)
         if self._stbd_rgbmatrix:
             self._set_color(self._stbd_rgbmatrix, color, show)
+
+    # ..........................................................................
+    @staticmethod
+    def set_column(rgbmatrix5x5, column, color, brightness, blank=True):
+        '''
+        Turn on a single column of the LEDs at maximum brightness.
+        '''
+        if column < 0 or column > 5:
+            raise ValueError('column argument \'{:d}\' out of range (0-5)'.format(column))
+        if blank:
+            rgbmatrix5x5.clear()
+        rows = 5
+        for y in range(0, rows):
+            rgbmatrix5x5.set_pixel(y, column, color.red, color.green, color.blue, brightness)
+        rgbmatrix5x5.show()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def set_all(rgbmatrix5x5, red, green, blue, show=True):
+        '''
+        Set the color of the RGB Matrix using discrete RGB values.
+        This is a static version of set_rgb_color().
+        '''
+        for y in range(5):
+            for x in range(5):
+                rgbmatrix5x5.set_pixel(x, y, red, green, blue)
+        if show:
+            rgbmatrix5x5.show()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_rgb_color(self, rgbmatrix5x5, red, green, blue, show=True):

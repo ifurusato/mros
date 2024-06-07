@@ -43,38 +43,30 @@ from core.macro_publisher import MacroPublisher
 from core.subscriber import Subscriber, GarbageCollector
 from core.system_subscriber import SystemSubscriber
 from core.macro_subscriber import MacroSubscriber
-from core.omni_subscriber import OmniSubscriber
+#from core.omni_subscriber import OmniSubscriber
 #from core.kr01_macrolibrary import KR01MacroLibrary
 
 from hardware.system import System
-#from hardware.ifs_publisher import IfsPublisher
-#from hardware.remote_ctrl_publisher import RemoteControlPublisher
-#from hardware.gpio_bmp_publisher import GpioBumperPublisher
-#from hardware.mcu_bmp_publisher import McuBumperPublisher
-#from hardware.ext_bmp_publisher import ExternalBumperPublisher
+from hardware.screen import Screen
+from hardware.sensor_array import SensorArray
+from hardware.remote_ctrl_publisher import RemoteControlPublisher
+from hardware.clock_publisher import ClockPublisher
 
-#from hardware.motor_subscriber import MotorSubscriber
-#from hardware.rgb_subscriber import RgbSubscriber
-#from hardware.remote_ctrl_subscriber import RemoteControlSubscriber
-#from hardware.bumper_subscriber import BumperSubscriber
-#from hardware.infrared_subscriber import InfraredSubscriber
+from hardware.remote_ctrl_subscriber import RemoteControlSubscriber
 
 from hardware.i2c_scanner import I2CScanner
 #from hardware.battery import BatteryCheck
-#from hardware.color import Color
-#from hardware.external_clock import ExternalClock
-#from hardware.irq_clock import IrqClock
 #from hardware.killswitch import KillSwitch
+from hardware.irq_clock import IrqClock
 from hardware.motor_configurer import MotorConfigurer
-#from hardware.motor_controller import MotorController
+from hardware.motion_controller import MotionController
 #from hardware.status import Status
+from hardware.indicator import Indicator
 
 #from mock.event_publisher import EventPublisher
-#from mock.external_clock import MockExternalClock
 #from mock.velocity_publisher import VelocityPublisher
-#from mock.mock_pot_publisher import MockPotPublisher
 #from hardware.gamepad_controller import GamepadController
-#from hardware.gamepad_publisher import GamepadPublisher # lazily-imported
+from hardware.gamepad_publisher import GamepadPublisher
 
 #from behave.behaviour_manager import BehaviourManager
 #from behave.avoid import Avoid
@@ -84,7 +76,7 @@ from hardware.motor_configurer import MotorConfigurer
 #from behave.sniff import Sniff
 #from behave.idle import Idle
 
-from experimental.experiment_mgr import ExperimentManager
+#from experimental.experiment_mgr import ExperimentManager
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class MROS(Component, FiniteStateMachine):
@@ -117,26 +109,28 @@ class MROS(Component, FiniteStateMachine):
         self._system.set_nice()
         globals.put('mros', self)
         # configuration…
-        self._config                = None
-        self._message_bus           = None
-        self._behaviour_mgr         = None
-        self._queue_publisher       = None
-        self._macro_publisher       = None
-        self._ifs_publisher         = None
-        self._remote_ctrl_publisher = None
-        self._experiment_mgr        = None
-        self._arbitrator            = None
-        self._controller            = None
-        self._gamepad_publisher     = None
-        self._gamepad_controller    = None
-        self._external_clock        = None # a Publisher used for accessory timing
-        self._irq_clock             = None # used for motor control timing
-        self._motor_ctrl            = None
-        self._ifs                   = None
-        self._killswitch            = None
-        self._status_light          = None
-        self._disable_leds          = False
-        self._closing               = False
+        self._config                 = None
+        self._message_bus            = None
+        self._system_subscriber      = None
+        self._behaviour_mgr          = None
+        self._queue_publisher        = None
+        self._macro_publisher        = None
+        self._clock_publisher        = None
+        self._sensor_array_publisher = None
+        self._remote_ctrl_publisher  = None
+#       self._experiment_mgr         = None
+        self._controller             = None
+        self._gamepad_publisher      = None
+        self._motion_controller      = None
+#       self._gamepad_controller     = None
+        self._external_clock         = None # a Publisher used for accessory timing
+        self._irq_clock              = None # used for motor control timing
+        self._motor_controller       = None
+#       self._killswitch             = None
+        self._screen                 = None
+        self._status_light           = None
+        self._disable_leds           = False
+        self._closing                = False
         self._log.info('oid: {}'.format(id(self)))
         self._log.info('initialised.')
 
@@ -153,27 +147,29 @@ class MROS(Component, FiniteStateMachine):
             '[1/2]' if arguments.start else '[1/1]')
         self._log.info('application log level: {}'.format(self._log.level.name))
 
-        # read YAML configuration ..............................................
+        # read YAML configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _loader = ConfigLoader(self._level)
         _config_filename = arguments.config_file
         _filename = _config_filename if _config_filename is not None else 'config.yaml'
         self._config = _loader.configure(_filename)
         self._is_raspberry_pi = self._system.is_raspberry_pi()
 
-        # configuration from command line arguments ............................
+        # configuration from command line arguments ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _args = self._config['mros'].get('arguments')
         # copy argument-based configuration over to _config (changing the names!)
 
 #       self._log.info('argument gamepad:     {}'.format(arguments.gamepad))
-#       _args['gamepad_enabled'] = arguments.gamepad and self._is_raspberry_pi
-#       self._log.info('gamepad enabled:      {}'.format(_args['gamepad_enabled']))
+        _args['gamepad_enabled'] = arguments.gamepad and self._is_raspberry_pi
+        self._log.info('gamepad enabled:      {}'.format(_args['gamepad_enabled']))
 #       _args['video_enabled']   = arguments.video
 #       self._log.info('video enabled:        {}'.format(_args['video_enabled']))
         _args['motors_enabled']  = not arguments.no_motors
         self._log.info('motors enabled:       {}'.format(_args['motors_enabled']))
 #       _args['mock_enabled']    = arguments.mock
 #       self._log.info('mock enabled:         {}'.format(_args['mock_enabled']))
+        _args['json_dump_enabled'] = arguments.json
+        self._log.info('json enabled:   {}'.format(_args['json_dump_enabled']))
         _args['experimental_enabled'] = arguments.experimental
         self._log.info('experiment enabled:   {}'.format(_args['experimental_enabled']))
         _args['log_enabled']    = arguments.log
@@ -183,12 +179,12 @@ class MROS(Component, FiniteStateMachine):
         self._log.info('argument config-file: {}'.format(arguments.config_file))
         self._log.info('argument level:       {}'.format(arguments.level))
 
-        # scan I2C bus .........................................................
+        # scan I2C bus ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _i2c_scanner = I2CScanner(self._config, self._log.level)
         _i2c_scanner.print_device_list()
         self._addresses = _i2c_scanner.get_int_addresses()
 
-        # check for availability of pigpio .....................................
+        # check for availability of pigpio ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         try:
             import pigpio
@@ -198,7 +194,7 @@ class MROS(Component, FiniteStateMachine):
             _pigpio_available = False
             self._log.warning('pigpio library not available; will attempt to use mocks where available.')
 
-        # establish basic subsumption components ..............................
+        # establish basic subsumption components ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         self._log.info('configure subsumption components…')
 
@@ -210,109 +206,95 @@ class MROS(Component, FiniteStateMachine):
         self._use_external_clock = self._config['mros'].get('use_external_clock')
         if self._use_external_clock and _pigpio_available:
             self._log.info('configuring external clock callback…')
-#           self._irq_clock      = IrqClock(self._config, level=self._level)
-#           self._external_clock = ExternalClock(self._config, self._message_bus, self._message_factory, self._level)
+            self._irq_clock = IrqClock(self._config, level=self._level)
         else:
-            self._irq_clock      = None # MockExternalClock(self._config, freq_hz=20, callback=None, level=self._level)
-#           self._external_clock = MockExternalClock(self._config, freq_hz=20, callback=None, level=self._level)
-            # TODO only if mocks permitted?
-            self._use_external_clock = True
+            self._irq_clock = None
 
-        # add motor controller ................................................
-        self._log.info('configure motor controller…')
-        _motor_configurer = MotorConfigurer(self._config, self._message_bus, _i2c_scanner, level=self._level)
-        self._motor_ctrl = MotorController(self._config, self._message_bus, _motor_configurer, self._irq_clock != None, self._level)
-        if self._use_external_clock:
-#           self._irq_clock.add_callback(self._motor_ctrl._external_callback_method)
-#           self._external_clock.add_callback(self._motor_ctrl._ext_callback_method, True)
-#           self._external_clock.add_callback(self._rgbmatrix.random_update)
-            pass
+        # JSON configuration dump ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        if _args['json_dump_enabled']:
+            print('DUMP JSON xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
 
-        # create components ....................................................
+        # create components ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _cfg = self._config['mros'].get('component')
 
-        # create publishers ................................
+        # create publishers  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _pubs = arguments.pubs if arguments.pubs else ''
 
+        _enable_sensor_array_publisher = _cfg.get('enable_sensor_array_publisher') or 'i' in _pubs
+        if _enable_sensor_array_publisher:
+            self._sensor_array_publisher = SensorArray(self._config, self._message_bus, self._message_factory, level=self._level)
+
         if _cfg.get('enable_queue_publisher') or 'q' in _pubs:
             self._queue_publisher = QueuePublisher(self._config, self._message_bus, self._message_factory, self._level)
-        if _cfg.get('enable_macro_publisher') or 'm' in _pubs:
-            _callback = None
-            self._macro_publisher = MacroPublisher(self._config, self._message_bus, self._message_factory, self._queue_publisher, _callback, self._level)
+#       if _cfg.get('enable_macro_publisher') or 'm' in _pubs:
+#           _callback = None
+#           self._macro_publisher = MacroPublisher(self._config, self._message_bus, self._message_factory, self._queue_publisher, _callback, self._level)
 #           _library = KR01MacroLibrary(self._macro_publisher)
 #           self._macro_publisher.set_macro_library(_library)
-
-        _enable_ifs_publisher = _cfg.get('enable_ifs_publisher') or 'i' in _pubs
-        if _enable_ifs_publisher:
-            self._ifs_publisher = IfsPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
 
         _enable_remote_ctrl_publisher = _cfg.get('enable_remote_ctrl_publisher') or 'i' in _pubs
         if _enable_remote_ctrl_publisher:
             self._remote_ctrl_publisher = RemoteControlPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
 
-        # first one wins!
-        if _cfg.get('enable_mcu_bumper_publisher') or 'b' in _pubs:
-            # bumpers connected via UART to an MCU
-            self._bumper_publisher = McuBumperPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
-        elif _cfg.get('enable_ext_bumper_publisher') or 'b' in _pubs:
-            # bumpers connected via GPIO pins using bespoke comms
-            self._bumper_publisher = ExternalBumperPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
-        elif _cfg.get('enable_gpio_bumper_publisher') or 'g' in _pubs:
-            # bumpers connected directly to GPIO pins
-            self._bumper_publisher = GpioBumperPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
+        _enable_clock_publisher = _cfg.get('enable_clock_publisher')
+        if _enable_clock_publisher and self._irq_clock:
+            self._clock_publisher = ClockPublisher(self._config, self._message_bus, self._message_factory, self._irq_clock, level=self._level)
 
-        _enable_event_publisher = _cfg.get('enable_event_publisher') or 'e' in _pubs
-        if _enable_event_publisher:
-            self._event_publisher = EventPublisher(self._config, self._message_bus, self._message_factory, self._motor_ctrl,
-                    self._system, level=self._level)
-            if _cfg.get('enable_velocity_publisher'):
-                self._log.warning('key event and potentiometer publishers both enabled; using only key events.')
-        if not _enable_event_publisher: # we only enable potentiometer publishers if event publisher isn't available
-            if _cfg.get('enable_velocity_publisher') or 'v' in _pubs:
-                self._pot_publisher = VelocityPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
-#           else:
-#               self._pot_publisher = MockPotPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
+#       _enable_event_publisher = _cfg.get('enable_event_publisher') or 'e' in _pubs
+#       if _enable_event_publisher:
+#           self._event_publisher = EventPublisher(self._config, self._message_bus, self._message_factory, self._motor_controller,
+#                   self._system, level=self._level)
+#           if _cfg.get('enable_velocity_publisher'):
+#               self._log.warning('key event and potentiometer publishers both enabled; using only key events.')
+
+#       if not _enable_event_publisher: # we only enable potentiometer publishers if event publisher isn't available
+#           if _cfg.get('enable_velocity_publisher') or 'v' in _pubs:
+#               self._pot_publisher = VelocityPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
 
         # add battery check publisher
-        if _cfg.get('enable_battery_publisher') or 'p' in _pubs:
-            self._battery = BatteryCheck(self._config, self._message_bus, self._message_factory, self._level)
+#       if _cfg.get('enable_battery_publisher') or 'p' in _pubs:
+#           self._battery = BatteryCheck(self._config, self._message_bus, self._message_factory, self._level)
 
-        _enable_killswitch= _cfg.get('enable_killswitch') or 'k' in _pubs
-        if _enable_killswitch and _pigpio_available:
-            self._killswitch = KillSwitch(self._config, self, level=self._level)
+#       _enable_killswitch= _cfg.get('enable_killswitch') or 'k' in _pubs
+#       if _enable_killswitch and _pigpio_available:
+#           self._killswitch = KillSwitch(self._config, self, level=self._level)
 
-        # create subscribers ...............................
+        # create subscribers ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _subs = arguments.subs if arguments.subs else ''
-        if _cfg.get('enable_rgb_subscriber') or 'r' in _subs:
-            self._rgb_subscriber = RgbSubscriber(self._config, self._message_bus, level=self._level)
-        if _cfg.get('enable_remote_ctrl_subscriber') or 'r' in _subs:
-            self._remote_ctrl_subscriber = RemoteControlSubscriber(self._config, self._message_bus, level=self._level)
+
         if _cfg.get('enable_system_subscriber') or 's' in _subs:
             self._system_subscriber = SystemSubscriber(self._config, self, self._message_bus, level=self._level)
-        if _cfg.get('enable_motor_subscriber') or 'm' in _subs:
-            self._motor_subscriber = MotorSubscriber(self._config, self._message_bus, self._motor_ctrl, level=self._level)
-        if _cfg.get('enable_bumper_subscriber') or 'b' in _subs:
-            self._bumper_subscriber = BumperSubscriber(self._config, self._message_bus, self._message_factory, self._motor_ctrl, level=self._level)
-        if _cfg.get('enable_infrared_subscriber') or 'i' in _subs:
-            self._infrared_subscriber = InfraredSubscriber(self._config, self._message_bus, self._motor_ctrl, level=self._level) # reacts to IR sensors
-        if _cfg.get('enable_macro_subscriber'):
-            if not self._macro_publisher:
-                raise ConfigurationError('macro subscriber requires macro publisher.')
-            self._macro_subscriber = MacroSubscriber(self._config, self._message_bus, self._message_factory, self._macro_publisher, self._level)
-        if _cfg.get('enable_omni_subscriber') or 'o' in _subs:
-            self._omni_subscriber = OmniSubscriber(self._config, self._message_bus, level=self._level) # reacts to IR sensors
+
+        if _cfg.get('enable_remote_ctrl_subscriber') or 'r' in _subs:
+            self._remote_ctrl_subscriber = RemoteControlSubscriber(self._config, self._message_bus, level=self._level)
+
+#       if _cfg.get('enable_macro_subscriber'):
+#           if not self._macro_publisher:
+#               raise ConfigurationError('macro subscriber requires macro publisher.')
+#           self._macro_subscriber = MacroSubscriber(self._config, self._message_bus, self._message_factory, self._macro_publisher, self._level)
+#       if _cfg.get('enable_omni_subscriber') or 'o' in _subs:
+#           self._omni_subscriber = OmniSubscriber(self._config, self._message_bus, level=self._level) # reacts to IR sensors
+
+        # add motion controller (subscriber) ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        self._log.info('configure motor controller…')
+        self._motion_controller = MotionController(self._config, self._message_bus, level=self._level)
+        self._motor_controller = self._motion_controller.motor_controller
+
+        if self._use_external_clock and self._irq_clock:
+            self._irq_clock.add_callback(self._motor_controller._external_callback_method)
+
         # and finally, the garbage collector:
         self._garbage_collector = GarbageCollector(self._config, self._message_bus, level=self._level)
 
-        _use_experiment_manager = self._config['mros'].get('component').get('enable_experimental') or Util.is_true(arguments.experimental)
-        if _use_experiment_manager:
-            self._experiment_mgr = ExperimentManager(self._config, level=self._level)
-            self._log.info(Fore.YELLOW + 'enabled experiment manager.')
+#       _use_experiment_manager = self._config['mros'].get('component').get('enable_experimental') or Util.is_true(arguments.experimental)
+#       if _use_experiment_manager:
+#           self._experiment_mgr = ExperimentManager(self._config, level=self._level)
+#           self._log.info(Fore.YELLOW + 'enabled experiment manager.')
 
-        # create behaviours ................................
+        # create behaviours ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _enable_behaviours = _cfg.get('enable_behaviours') or Util.is_true(arguments.behave)
         if _enable_behaviours:
@@ -322,32 +304,32 @@ class MROS(Component, FiniteStateMachine):
             _bcfg = self._config['mros'].get('behaviour')
             # create and register behaviours (listed in priority order)
             if _bcfg.get('enable_avoid_behaviour'):
-                self._avoid  = Avoid(self._config, self._message_bus, self._message_factory, self._motor_ctrl,
+                self._avoid  = Avoid(self._config, self._message_bus, self._message_factory, self._motor_controller,
                         external_clock=self._external_clock, level=self._level)
             if _bcfg.get('enable_roam_behaviour'):
-                self._roam   = Roam(self._config, self._message_bus, self._message_factory, self._motor_ctrl,
+                self._roam   = Roam(self._config, self._message_bus, self._message_factory, self._motor_controller,
                         external_clock=self._external_clock, level=self._level)
             if _bcfg.get('enable_swerve_behaviour'):
-                self._swerve = Swerve(self._config, self._message_bus, self._message_factory, self._motor_ctrl,
+                self._swerve = Swerve(self._config, self._message_bus, self._message_factory, self._motor_controller,
                         self._external_clock, level=self._level)
             if _bcfg.get('enable_moth_behaviour'):
-                self._moth   = Moth(self._config, self._message_bus, self._message_factory, self._motor_ctrl, self._level)
+                self._moth   = Moth(self._config, self._message_bus, self._message_factory, self._motor_controller, self._level)
             if _bcfg.get('enable_sniff_behaviour'):
-                self._sniff  = Sniff(self._config, self._message_bus, self._message_factory, self._motor_ctrl, self._level)
+                self._sniff  = Sniff(self._config, self._message_bus, self._message_factory, self._motor_controller, self._level)
             if _bcfg.get('enable_idle_behaviour'):
                 self._idle   = Idle(self._config, self._message_bus, self._message_factory, self._level)
 
         if _args['gamepad_enabled'] or _cfg.get('enable_gamepad_publisher') or 'g' in _pubs:
-            try:
-                from hardware.gamepad_publisher import GamepadPublisher
-                self._gamepad_publisher = GamepadPublisher(self._config, self._message_bus, self._message_factory, True, self._level)
-                try:
-                    from hardware.gamepad_controller import GamepadController
-                    self._gamepad_controller = GamepadController(self._message_bus, self._level)
-                except Exception as e:
-                    self._log.error('unable to import GamepadeController: {}'.format(e))
-            except Exception as e:
-                self._log.error('unable to import GamepadPublisher: {}'.format(e))
+            self._gamepad_publisher = GamepadPublisher(self._config, self._message_bus, self._message_factory, True, self._level)
+#           self._gamepad_controller = GamepadController(self._message_bus, self._level)
+
+        # hardware ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+        # LED on mast
+        _pin = 13 # TODO get from config
+        self._status_light = Indicator(_pin, Level.INFO)
+        # TFT screen
+        self._screen = Screen(self._config, Level.INFO)
 
         self._export_config = False
         if self._export_config:
@@ -361,10 +343,10 @@ class MROS(Component, FiniteStateMachine):
         arbitrator, controller, enables the set of features, then starts the main
         OS loop.
         '''
-        self._log.heading('starting', 'starting k-series robot operating system (mros)…', '[2/2]' )
+        self._log.heading('starting', 'starting m-series robot operating system (mros)…', '[2/2]' )
         FiniteStateMachine.start(self)
 
-        self._status_light = Status(self._config, Level.INFO)
+        self._screen.off()
         self._status_light.enable()
 
         self._disable_leds = self._config['pi'].get('disable_leds')
@@ -372,34 +354,35 @@ class MROS(Component, FiniteStateMachine):
             # disable Pi LEDs since they may be distracting
             self._set_pi_leds(False)
 
-        if self._killswitch:
-            self._killswitch.enable()
+#       if self._killswitch:
+#           self._killswitch.enable()
 
-        if self._experiment_mgr:
-            self._experiment_mgr.enable()
+#       if self._experiment_mgr:
+#           self._experiment_mgr.enable()
 
-        # begin main loop ..................................
+        # begin main loop ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         self._log.notice('Press Ctrl-C to exit.')
         self._log.info('begin main os loop.\r')
 
-        if self._motor_ctrl:
-            self._motor_ctrl.enable()
-
-        # enable arbitrator tasks (normal functioning of robot)
-#       self._arbitrator.start()
+        if self._motor_controller:
+            self._motor_controller.enable()
 
         # we enable ourself if we get this far successfully
         Component.enable(self)
         FiniteStateMachine.enable(self)
 
-        self._log.info('enabling external clock…')
         if self._irq_clock:
+            self._log.info('enabling external clock…')
             self._irq_clock.enable()
 
+        if self._system_subscriber:
+            self._log.info('enabling system subscriber…')
+            self._system_subscriber.enable()
+
         # print registry of components
-#       _component_registry = globals.get('component-registry')
-#       _component_registry.print_registry()
+        _component_registry = globals.get('component-registry')
+        _component_registry.print_registry()
 
         # now in main application loop until quit or Ctrl-C…
         self._log.info('enabling message bus…')
@@ -407,7 +390,7 @@ class MROS(Component, FiniteStateMachine):
         # that blocks so we never get here until the end…
         self._log.info('main loop closed.')
 
-        # end main loop ....................................
+        # end main loop ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_config(self):
@@ -445,6 +428,27 @@ class MROS(Component, FiniteStateMachine):
         return self._message_factory
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_motion_controller(self):
+        '''
+        Returns the MotionController.
+        '''
+        return self._motion_controller
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_status_light(self):
+        '''
+        Returns the status light.
+        '''
+        return self._status_light
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_screen(self):
+        '''
+        Returns the TFT screen.
+        '''
+        return self._screen
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_behaviour_manager(self):
         '''
         Returns the BehaviourManager, None if not used.
@@ -452,11 +456,11 @@ class MROS(Component, FiniteStateMachine):
         return self._behaviour_mgr
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get_macro_publisher(self):
+    def get_clock_publisher(self):
         '''
-        Returns the MacroPublisher, None if not used.
+        Returns the ClockPublisher, None if not used.
         '''
-        return self._macro_publisher
+        return self._clock_publisher
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_gamepad_publisher(self):
@@ -466,6 +470,13 @@ class MROS(Component, FiniteStateMachine):
         return self._gamepad_publisher
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_macro_publisher(self):
+        '''
+        Returns the MacroPublisher, None if not used.
+        '''
+        return self._macro_publisher
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_queue_publisher(self):
         '''
         Returns the QueuePublisher, None if not used.
@@ -473,39 +484,32 @@ class MROS(Component, FiniteStateMachine):
         return self._queue_publisher
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get_ifs_publisher(self):
+    def get_sensor_array_publisher(self):
         '''
-        Returns the IfsPublisher, None if not used.
+        Returns the SensorArray, None if not used.
         '''
-        return self._ifs_publisher
+        return self._sensor_array_publisher
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get_motor_ctrl(self):
+    def get_motor_controller(self):
         '''
         Returns the motor controller.
         '''
-        return self._motor_ctrl
+        return self._motor_controller
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get_experiment_manager(self):
-        '''
-        Returns the ExperimentManager, None if not used.
-        '''
-        return self._experiment_mgr
+#   # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+#   def get_experiment_manager(self):
+#       '''
+#       Returns the ExperimentManager, None if not used.
+#       '''
+#       return self._experiment_mgr
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get_external_clock(self):
-        '''
-        Returns the ExternalClock, None if not used.
-        '''
-        return self._external_clock
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get_irq_clock(self):
-        '''
-        Returns the IRQ clock used for the motor controller, None if not used.
-        '''
-        return self._irq_clock
+#   # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+#   def get_irq_clock(self):
+#       '''
+#       Returns the IRQ clock used for the motor controller, None if not used.
+#       '''
+#       return self._irq_clock
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _set_pi_leds(self, enable):
@@ -535,9 +539,10 @@ class MROS(Component, FiniteStateMachine):
         This halts any motor activity, demands a sudden halt of all tasks,
         then shuts down the OS.
         '''
-        self._log.info(Fore.MAGENTA + '👾 shutdown: ' + Style.BRIGHT + 'kill! kill! kill! kill!')
+        self._log.info(Fore.MAGENTA + Style.BRIGHT + 'shutting down…')
         self.close()
         # we never get here if we shut down properly
+        self._log.error(Fore.RED + 'shutdown error.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable(self):
@@ -554,8 +559,8 @@ class MROS(Component, FiniteStateMachine):
                 self._experiment_mgr.disable()
             while not Component.disable(self):
                 self._log.info('disabling component…')
-            if self._motor_ctrl:
-                self._motor_ctrl.disable()
+            if self._motor_controller:
+                self._motor_controller.disable()
             if self._external_clock and not self._external_clock.disabled:
                 self._external_clock.disable()
             if self._irq_clock and not self._irq_clock.disabled:
@@ -582,33 +587,42 @@ class MROS(Component, FiniteStateMachine):
         elif self.closing:
             self._log.warning('already closing.')
         else:
-            self._log.info('closing…')
-            self._closing = True
-            _component_registry = globals.get('component-registry')
-            _registry = _component_registry.get_registry()
-            # closes all components that are not a publisher, subscriber, the message bus or mros itself…
-            while len(_registry) > 0:
-                _name, _component = _registry.popitem(last=True)
-                if not isinstance(_component, Publisher) and not isinstance(_component, Subscriber) \
-                        and _component != self and _component != self._message_bus:
-                    self._log.info('closing component \'{}\' ({})…'.format(_name, _component.classname))
-                    _component.close()
-            time.sleep(0.1)
-            if self._message_bus and not self._message_bus.closed:
-                self._log.info('closing message bus from mros…')
-                self._message_bus.close()
-                self._log.info('closed message bus.')
-            while not Component.close(self): # will call disable()
-                self._log.info('closing component…')
-            if self._disable_leds: # restore normal function of Pi LEDs
-                self._set_pi_leds(True)
-            FiniteStateMachine.close(self)
-            if self._status_light:
-                self._status_light.close()
-            self._closing = False
-            self._log.info('application closed.')
-            self._log.close()
-#           sys.exit(0)
+            try:
+                self._log.info('closing…')
+                self._closing = True
+                _component_registry = globals.get('component-registry')
+                _registry = _component_registry.get_registry()
+                # closes all components that are not a publisher, subscriber, the message bus or mros itself…
+                while len(_registry) > 0:
+                    _name, _component = _registry.popitem(last=True)
+                    if not isinstance(_component, Publisher) and not isinstance(_component, Subscriber) \
+                            and _component != self and _component != self._message_bus:
+                        self._log.debug('closing component \'{}\' ({})…'.format(_name, _component.classname))
+                        _component.close()
+                time.sleep(0.1)
+                if self._message_bus and not self._message_bus.closed:
+                    self._log.info('closing message bus from mros…')
+                    self._message_bus.close()
+                    self._log.info('closed message bus.')
+                while not Component.close(self): # will call disable()
+                    self._log.info('closing component…')
+                if self._motion_controller:
+                    self._motion_controller.close()
+                if self._status_light:
+                    self._status_light.close()
+#               if self._screen:
+#                   self._screen.on()
+                if self._disable_leds: # restore normal function of Pi LEDs
+                    self._set_pi_leds(True)
+                FiniteStateMachine.close(self)
+                if self._status_light:
+                    self._status_light.close()
+                self._closing = False
+                self._log.info('application closed.')
+                self._log.close()
+#               sys.exit(0)
+            except Exception as e:
+                self._log.error('error closing application: {}\n{}'.format(e, traceback.format_exc()))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def export_config(self):
@@ -684,6 +698,7 @@ def parse_args():
     parser.add_argument('--configure',    '-c', action='store_true', help='run configuration (included by -s)')
     parser.add_argument('--start',        '-s', action='store_true', help='start mros')
     parser.add_argument('--experimental', '-x', action='store_true', help='enable experiment manager')
+    parser.add_argument('--json',         '-j', action='store_true', help='dump YAML configuration as JSON file')
     parser.add_argument('--no-motors',    '-n', action='store_true', help='disable motors (uses mock)')
     parser.add_argument('--gamepad',      '-g', action='store_true', help='enable bluetooth gamepad control')
     parser.add_argument('--video',        '-v', action='store_true', help='enable video if installed')

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2021-03-10
-# modified: 2021-08-20
+# modified: 2024-06-03
 #
 # An asyncio-based publish/subscribe-style message bus guaranteeing exactly-once
 # delivery for each message. This is done by populating each message with the
@@ -63,7 +63,7 @@ class MessageBus(Component):
             logging.basicConfig(level=logging.DEBUG)
         self._queue = PeekableQueue(level)
         self._arbitrator = Arbitrator(level)
-        _cfg = config['kros'].get('message_bus')
+        _cfg = config['mros'].get('message_bus')
         self._max_age_ms             = _cfg.get('max_age_ms') # was: 20.0ms
         self._publish_delay_sec      = _cfg.get('publish_delay_sec') # was: 0.01 sec
         self._publishers             = []
@@ -122,6 +122,8 @@ class MessageBus(Component):
                 for _task in asyncio.all_tasks(loop=self._loop):
                     if _task is not asyncio.current_task() and ( include_hidden or not _task.get_name().startswith('__')):
                         _tasks.append(_task)
+            except KeyboardInterrupt:
+                self._log.error('Ctrl-C caught; exiting…')
             except RuntimeError as e:
                 self._log.debug('cannot get task list: {}'.format(e))
         return _tasks
@@ -132,9 +134,6 @@ class MessageBus(Component):
         Clears the task list of any completed tasks.
         '''
         _tasks = self.get_all_tasks()
-#       if len(_tasks) == 0:
-#           self._log.info('no outstanding tasks.')
-#       else:
         if len(_tasks) > 0:
             self._log.debug('clearing {:d} outstanding tasks.'.format(len(_tasks)))
             for _task in _tasks:
@@ -184,7 +183,6 @@ class MessageBus(Component):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     async def arbitrate(self, payload):
-        self._log.info('arbitrating payload {}...'.format(payload.event.name))
         await self._arbitrator.arbitrate(payload)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -203,9 +201,9 @@ class MessageBus(Component):
     @property
     def verbose(self):
         '''
-        Returns True if the logger level is INFO.
+        Returns True if the logger level is DEBUG.
         '''
-        return self._log.level == Level.INFO
+        return self._log.level == Level.DEBUG
 
     @verbose.setter
     def verbose(self, verbose):
@@ -234,7 +232,7 @@ class MessageBus(Component):
         if publisher in self._publishers:
             raise ValueError('publisher list already contains \'{}\''.format(publisher.name))
         self._publishers.append(publisher)
-        self._log.debug('registered publisher: \'{}\'; {:d} publisher{} in list.'.format( \
+        self._log.info('registered publisher: \'{}\'; {:d} publisher{} in list.'.format( \
                 publisher.name, len(self._publishers), 's' if len(self._publishers) > 1 else ''))
 
     def get_publisher(self, name):
@@ -356,32 +354,27 @@ class MessageBus(Component):
         loop will not be entered.
         '''
         self._enable_publishers()
-        self._log.info('starting {:d} subscriber{}...'.format(len(self._subscribers), '' if len(self._subscribers) == 1 else 's'))
+        self._log.info('starting {:d} subscriber{}…'.format(len(self._subscribers), '' if len(self._subscribers) == 1 else 's'))
         for subscriber in self._subscribers:
             subscriber.start()
-        self._log.info('starting consume loop with {:d} subscriber{}...'.format(
+        self._log.info('starting consume loop with {:d} subscriber{}…'.format(
                 len(self._subscribers), '' if len(self._subscribers) == 1 else 's'))
-        self._log.info('start callbacks...')
+        self._log.info('start callbacks…')
         for _callback in self._start_callbacks:
             _callback()
         try:
             while self.enabled and len(self._subscribers) > 0:
                 for subscriber in self._subscribers:
-#                   self._log.debug('publishing to subscriber {}...'.format(subscriber.name))
                     await subscriber.consume()
-#                   self._log.debug('published to subscriber {}...'.format(subscriber.name))
             self._log.info('completed consume loop.')
+        except KeyboardInterrupt:
+            self._log.error('Ctrl-C caught; exiting…')
         finally:
             self._log.info('finally: completed consume loop.')
-           
-#           self._log.info('completed consume loop with {:d} subscriber{}...'.format(
-#                   len(self._subscribers), '' if len(self._subscribers) == 1 else 's'))
-#           for subscriber in self._subscribers:
-#               self._log.info('subscriber: {}; enabled: {}'.format(subscriber.name, subscriber.enabled))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _enable_publishers(self):
-        self._log.info('enabling {:d} publisher{}...'.format(len(self._publishers), '' if len(self._publishers) == 1 else 's'))
+        self._log.info('enabling {:d} publisher{}…'.format(len(self._publishers), '' if len(self._publishers) == 1 else 's'))
         for publisher in self._publishers:
             publisher.start()
             if not publisher.enabled:
@@ -444,13 +437,9 @@ class MessageBus(Component):
 
         NOTE: calls to this function should be await'd.
         '''
-#       if ( message.event is not Event.CLOCK_TICK and message.event is not Event.CLOCK_TOCK ):
-#       self._log.debug('rx request to publish message: {}'.format(message.name)
-#               + ' (event: {}; age: {:d}ms);'.format(message.event.label, message.age))
         _publish_task = asyncio.create_task(self._queue.put(message), name='publish-message-{}'.format(message.name))
         # the first time the message is published we update the 'last_message_timestamp'
         self.update_last_message_timestamp()
-#       self._log.debug('created task: {}'.format(_publish_task.get_name()))
         await asyncio.sleep(self._publish_delay_sec)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -461,11 +450,9 @@ class MessageBus(Component):
 
         NOTE: calls to this function should be await'd.
         '''
-#       self._log.debug('republishing message: {} (event: {}; age: {:d}ms);'.format(message.name, message.event.label, message.age))
         asyncio.create_task(self._queue.put(message), name='republish-message-{}'.format(message.name))
         # when the message is republished we also update the 'last_message_timestamp'
         self.update_last_message_timestamp()
-#       self._log.debug('republished message: {} (event: {}; age: {:d}ms);'.format(message.name, message.event.label, message.age))
 
     # exception handling ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
@@ -488,20 +475,20 @@ class MessageBus(Component):
         '''
         Cleanup tasks tied to the service's shutdown.
         '''
-        self._log.info('starting shutdown procedure...')
+        self._log.info('starting shutdown procedure…')
         if signal:
-            self._log.info('received exit signal {}...'.format(signal))
-        self._log.info('nacking outstanding tasks...')
+            self._log.info('received exit signal {}…'.format(signal))
+        self._log.info('nacking outstanding tasks…')
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         [task.cancel() for task in tasks]
-        self._log.info('cancelling {:d} outstanding tasks...'.format(len(tasks)))
+        self._log.info('cancelling {:d} outstanding tasks…'.format(len(tasks)))
         _gathered_tasks = await asyncio.gather(*tasks, return_exceptions=False)
         self._log.info('gathered tasks: {}'.format(_gathered_tasks))
         if self.loop.is_running():
-            self._log.info('stopping event loop...')
+            self._log.info('stopping event loop…')
             self.loop.stop()
             self._log.info('event loop stopped.')
-        self._log.info('shutting down...')
+        self._log.info('shutting down…')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def __close_message_bus(self):
@@ -514,15 +501,17 @@ class MessageBus(Component):
         try:
             if self.loop:
                 if self.loop.is_running():
-                    self._log.info('stopping event loop...')
+                    self._log.info('stopping event loop…')
                     self.loop.stop()
                     self._log.info('event loop stopped.')
                 if not self.loop.is_running() and not self.loop.is_closed():
-                    self._log.info('closing event loop...')
+                    self._log.info('closing event loop…')
                     self.loop.close()
                     self._log.info('event loop closed.')
             else:
                 self._log.warning('no message bus event loop!')
+        except KeyboardInterrupt:
+            self._log.error('Ctrl-C caught; exiting…')
         except Exception as e:
             self._log.error('error stopping event loop: {}'.format(e))
         return True
@@ -539,6 +528,8 @@ class MessageBus(Component):
             for _task in asyncio.all_tasks():
                 if _task.get_name() == name:
                     return _task
+        except KeyboardInterrupt:
+            self._log.error('Ctrl-C caught; exiting…')
         except RuntimeError as e:
             self._log.error('unable to get task: {}'.format(e))
         return None
@@ -547,10 +538,9 @@ class MessageBus(Component):
     def enable(self):
         if not self.closed and not self.enabled:
             Component.enable(self)
-            self._log.info('starting message bus forever loop...')
+            self._log.info('starting message bus forever loop…')
             # this call will block
             return self._get_event_loop()
-#           self._log.info('exited message bus forever loop.')
         return None
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -579,14 +569,14 @@ class MessageBus(Component):
             self._loop.set_exception_handler(self.handle_exception)
             self._loop.create_task(self._start_consuming(), name='__event_loop__')
         if not self._loop.is_running():
-            self._log.info('starting asyncio task loop...')
-#           try:
+            self._log.info('starting asyncio task loop…')
             self._loop.run_forever()
-#           finally:
-#               if self.loop.is_running() and not self.loop.is_closed():
-#                   self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-#                   self.loop.close()
         return self._loop
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _kill(self):
+        print('CLOSE')
+        self.close()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable(self):
@@ -603,11 +593,11 @@ class MessageBus(Component):
             self._log.warning('already disabled.')
         else:
             Component.disable(self)
-            self._log.info('disabling...')
-            self._log.info('closing {:d} publishers...'.format(len(self._publishers)))
+            self._log.info('disabling…')
+            self._log.info('closing {:d} publishers…'.format(len(self._publishers)))
             [publisher.close() for publisher in self._publishers]
             self._publishers.clear()
-            self._log.info('closing {:d} subscribers...'.format(len(self._subscribers)))
+            self._log.info('closing {:d} subscribers…'.format(len(self._subscribers)))
             [subscriber.close() for subscriber in self._subscribers]
             self._subscribers.clear()
             self.clear_tasks()
@@ -631,7 +621,7 @@ class MessageBus(Component):
         elif self.closing:
             self._log.warning('already closing.')
         else:
-            self._log.info('closing...')
+            self._log.info('closing…')
             Component.close(self) # will call disable()
             self._closing = True
             self._closing = False

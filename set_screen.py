@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -34,9 +34,9 @@ if setting == 'on' or setting == 'off':
     _screen = Screen(_config, Level.INFO)
   
     if setting == 'on':
-        _screen.enable()
+        _screen.on()
     else:
-        _screen.disable()
+        _screen.off()
 
 else:
     print(Fore.RED + "ERROR: expected 'on' or 'off'." + Style.RESET_ALL)

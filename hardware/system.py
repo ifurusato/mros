@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2021-07-13
-# modified: 2021-07-13
+# modified: 2024-05-19
 #
 
 import sys, platform
@@ -23,16 +23,16 @@ class System(object):
     '''
     A collection of system control/info/statistical methods.
     '''
-    def __init__(self, kros, level=Level.INFO):
-        global _kros
+    def __init__(self, mros, level=Level.INFO):
+        global _mros
         self._log = Logger('system', level)
-        self._kros = kros
-        _kros = kros
+        self._mros = mros
+        _mros = mros
         self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_nice(self):
-        # set KROS as high priority process
+        # set MROS as high priority process
         self._log.info('setting process as high priority...')
         proc = psutil.Process(os.getpid())
         proc.nice(10)
@@ -82,8 +82,8 @@ class System(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def print_sys_info(self):
-        self._log.info('kros:  state: ' + Fore.YELLOW + '{}  \t'.format(self._kros.state.name) \
-                + Fore.CYAN + 'enabled: ' + Fore.YELLOW + '{}'.format(self._kros.enabled))
+        self._log.info('mros:  state: ' + Fore.YELLOW + '{}  \t'.format(self._mros.state.name) \
+                + Fore.CYAN + 'enabled: ' + Fore.YELLOW + '{}'.format(self._mros.enabled))
         # disk space ...................
         self._log.info('root file system:')
         _rootfs = psutil.disk_usage('/')

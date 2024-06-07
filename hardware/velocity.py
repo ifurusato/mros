@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -32,7 +32,7 @@ class Velocity(object):
     of encoder ticks/steps per second corresponds to a given velocity,
     which can be converted to an SI unit (e.g., cm/sec).
 
-    Based on some hardware constants from the robot:
+    Based on some hardware constants from the KR01 robot:
 
       68.0mm diameter tires
       213.62830mm/21.362830cm wheel circumference
@@ -109,22 +109,22 @@ class Velocity(object):
         # add callback from motor's update method
 #       self._motor.add_callback(self.tick)
         # establish sample frequency
-        self._freq_hz = config['kros'].get('motor').get('pid_controller').get('sample_freq_hz')
+        self._freq_hz = config['mros'].get('motor').get('pid_controller').get('sample_freq_hz')
         self._period_ms = 1000.0 / self._freq_hz
         self._log.info('sample frequency:   \t{:d}Hz ({:>5.2f}ms)'.format(self._freq_hz, self._period_ms))
         # now calculate some geometry-based conversions
-        _config = config['kros'].get('geometry')
-        self._steps_per_rotation  = _config.get('steps_per_rotation') # 494 encoder steps per wheel rotation
-        self._log.info('encoder steps/rotation:\t{:d}'.format(self._steps_per_rotation))
-        self._wheel_diameter      = _config.get('wheel_diameter') # 68.0mm
+        _cfg = config['mros'].get('geometry')
+        self._steps_per_rotation  = _cfg.get('steps_per_rotation') # 494 encoder steps per wheel rotation
+        self._log.info('encoder steps/rotation:\t{:7.2f}'.format(self._steps_per_rotation))
+        self._wheel_diameter      = _cfg.get('wheel_diameter') # 68.0mm
         self._log.info('wheel diameter:     \t{:4.1f}mm'.format(self._wheel_diameter))
         self._wheel_circumference = self._wheel_diameter * math.pi / 10.0
         self._log.info('wheel circumference:\t{:7.4f}cm'.format(self._wheel_circumference))
         # convert raw velocity to approximate a percentage
         self._steps_per_cm = self._steps_per_rotation / self._wheel_circumference
         self._log.info('conversion constant:\t{:7.4f} steps/cm'.format(self._steps_per_cm))
-        # sanity check: perform conversion for velocity of 1 wheel rotation (494 steps)
-        # per second, where the returned value should be the circumference (21.36cm)
+        # sanity check: perform conversion for velocity of 1 wheel rotation (e.g., 494 steps)
+        # per second, where the returned value should be the circumference (e.g., 21.36cm)
         _test_velocity = self.steps_to_cm(self._steps_per_rotation)
         self._log.info('example conversion:\t{:7.4f}cm/rotation'.format(_test_velocity))
         assert _test_velocity == self._wheel_circumference
@@ -157,6 +157,7 @@ class Velocity(object):
         This should be called regularly every 50ms (i.e., at 20Hz), calculating
         velocity based on the tick/step count of the motor encoder.
         '''
+#       self._log.info(Fore.BLUE + '{:+d} steps'.format(self._motor.steps))
         if self._enabled:
             if self._motor.enabled: # then calculate velocity from motor encoder's step count
                 _time_diff_ms = 0.0

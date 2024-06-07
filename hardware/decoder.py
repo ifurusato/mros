@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-01-18
-# modified: 2020-08-30
+# modified: 2024-06-02
 #
 # For installing pigpio, see:  http://abyz.me.uk/rpi/pigpio/download.html
 #
@@ -29,6 +29,12 @@
 # 
 
 import sys, traceback
+
+try:
+    import pigpio
+except ImportError as ie:
+    print("This script requires the pigpio module.\nInstall with: pip3 install --user pigpio")
+    raise ModuleNotFoundError('pigpio not installed.')
 from colorama import init, Fore, Style
 init()
 
@@ -93,18 +99,6 @@ class Decoder(object):
         self._level_b   = 0
         self._last_gpio = None
         self._increment = 1
-        self._configure()
-        self._log.info('ready.')
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _configure(self):
-        try:
-            import pigpio
-        except ImportError as ie:
-        #   import mock.pigpio as pigpio
-            print("This script requires the pigpio module.\nInstall with: pip3 install --user pigpio")
-#           raise ModuleNotFoundError('pigpio not installed.')
-            return None
         try:
             _pi = pigpio.pi()
             if _pi is None:
@@ -113,21 +107,21 @@ class Decoder(object):
                 raise Exception('can\'t connect to pigpio daemon; did you start it?')
             _pi._notify.name = 'pi.callback'
             self._log.info('pigpio version {}'.format(_pi.get_pigpio_version()))
-            self._log.info('configuring encoder...')
             _pi.set_mode(self._gpio_a, pigpio.INPUT)
             _pi.set_mode(self._gpio_b, pigpio.INPUT)
             _pi.set_pull_up_down(self._gpio_a, pigpio.PUD_UP)
             _pi.set_pull_up_down(self._gpio_b, pigpio.PUD_UP)
+            self._log.info('configured {} motor encoder with channel A on pin {}, channel B on pin {}.'.format(orientation.name, self._gpio_a, self._gpio_b))
 #           _edge = pigpio.RISING_EDGE  # default
 #           _edge = pigpio.FALLING_EDGE
             _edge = pigpio.EITHER_EDGE
             self.callback_a = _pi.callback(self._gpio_a, _edge, self._pulse_a)
             self.callback_b = _pi.callback(self._gpio_b, _edge, self._pulse_b)
-            return _pi
         except Exception as e:
             self._log.error('error importing and/or configuring Motor: {}'.format(e))
             traceback.print_exc(file=sys.stdout)
-            raise Exception('unable to instantiate decoder.')
+            raise Exception('unable to configure decoder.')
+        self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_reversed(self):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -24,9 +24,9 @@ from core.message_factory import MessageFactory
 class Experiment(Component):
     '''
     Experiment extends Component to form the basis of quick experiments that
-    can run on keypresses to toggle them on and off from within KROS. Extend
+    can run on keypresses to toggle them on and off from within MROS. Extend
     this class to build an experimental task or test. It provides access to
-    many of the key KROS components.
+    many of the key MROS components.
 
     One of the goals of the Experiment class is to permit a zero-argument
     constructor so that the class can instantiated via reflection. The name
@@ -44,16 +44,16 @@ class Experiment(Component):
     :param name:    the name for this object
     '''
     def __init__(self, name=None):
-        self._kros = globals.get('kros')
-        if self._kros is None:
-            raise GlobalsError('unable to register experiment: no KROS application available as a global variable.')
+        self._mros = globals.get('mros')
+        if self._mros is None:
+            raise GlobalsError('unable to register experiment: no MROS application available as a global variable.')
         self._name        = 'x:{}'.format(name if name else 'unknown')
-        self._level       = self._kros.get_level()
+        self._level       = self._mros.get_level()
         self._log         = Logger(self._name, self._level)
-        self._config      = self._kros.get_config()
-        self._message_bus = self._kros.get_message_bus()
-        self._message_factory = self._kros.get_message_factory()
-        self._ext_clock   = self._kros.get_external_clock()
+        self._config      = self._mros.get_config()
+        self._message_bus = self._mros.get_message_bus()
+        self._message_factory = self._mros.get_message_factory()
+        self._ext_clock   = self._mros.get_external_clock()
         Component.__init__(self, self._log, suppressed=True, enabled=False)
         self._log.info('ready.')
 
@@ -77,9 +77,9 @@ class Experiment(Component):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
-    def kros(self):
-        ''' Return the KROS application. '''
-        return self._kros
+    def mros(self):
+        ''' Return the MROS application. '''
+        return self._mros
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property

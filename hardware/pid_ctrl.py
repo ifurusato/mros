@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-04-20
-# modified: 2020-09-26
-# modified: 2021-07-29
+# modified: 2024-05-19
 #
 
 import sys
+import itertools # TEMP
 from collections import deque as Deque
 from colorama import init, Fore, Style
 init()
@@ -21,7 +21,6 @@ from core.component import Component
 from core.event import Event
 from core.orientation import Orientation
 from core.message import Message
-from core.message_bus import MessageBus
 from hardware.pid import PID
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -32,7 +31,6 @@ class PIDController(Component):
     on the same interval as the PID calls.
 
     :param config:       The application configuration, read from a YAML file.
-    :param message_bus:  The application message bus.
     :param motor:        The motor to be controlled.
     :param setpoint:     The initial setpoint or target output
     :param period:       The sample time in seconds before generating a new output value.
@@ -41,21 +39,19 @@ class PIDController(Component):
     :param enabled:      Initial enabled state.
     :param level:        The log level, e.g., Level.INFO.
     '''
-    def __init__(self, config, message_bus, motor, setpoint=0.0, period=0.01, suppressed=False, enabled=True, level=Level.INFO):
+    def __init__(self, config, motor, setpoint=0.0, period=0.01, suppressed=False, enabled=True, level=Level.INFO):
         if not isinstance(config, dict):
             raise ValueError('wrong type for config argument: {}'.format(type(config)))
         self._config = config
-        if not isinstance(message_bus, MessageBus):
-            raise ValueError('wrong type for message bus argument: {}'.format(type(message_bus)))
-        self._message_bus = message_bus
         if motor is None:
             raise ValueError('null motor argument.')
         self._motor = motor
         self._orientation = motor.orientation
         self._log = Logger('pid-ctrl:{}'.format(self._orientation.label), level)
         Component.__init__(self, self._log, suppressed=suppressed, enabled=enabled)
+        self._counter = itertools.count() # TEMP
         # PID configuration ................................
-        _cfg = config['kros'].get('motor').get('pid_controller')
+        _cfg = config['mros'].get('motor').get('pid_controller')
         _kp         = _cfg.get('kp') # proportional gain
         _ki         = _cfg.get('ki') # integral gain
         _kd         = _cfg.get('kd') # derivative gain
@@ -71,6 +67,14 @@ class PIDController(Component):
         self._power        = 0.0
         self._last_power   = 0.0
         self._log.info('ready.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def pid(self):
+        '''
+        Return the underlying PID controller.
+        '''
+        return self._pid
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -135,18 +139,22 @@ class PIDController(Component):
         if self.enabled:
             self._pid.setpoint = target_velocity
             _velocity = self._motor.velocity
+
             # converts velocity to power...
             _pid_output = self._pid(_velocity)
             self._power += _pid_output
             _motor_power = self._power / 100.0
             self._last_power = self._power
+
 #           _mean_setpoint = self._get_mean_setpoint(self._pid.setpoint)
 #           if _mean_setpoint == 0.0:
-#               self._log.info(Fore.WHITE + Style.DIM + 'set power for {} motor: {:<5.2f} (pid output: {:5.2f})'.format(self._orientation.label, _motor_power, _pid_output))
-#               self._motor. set_motor_power(0.0)
+#               self._log.info(Fore.WHITE + Style.BRIGHT + 'set power for {} motor: {:<5.2f} to 0.0 (pid output: {:5.2f})'.format(self._orientation.label, _motor_power, _pid_output))
+#               self._motor.set_motor_power(0.0)
 #           else:
-#           self._log.info(Fore.WHITE + Style.BRIGHT + 'set {} motor;\n    velocity: {:5.2f}; targetv : {:5.2f}; PID setpoint: {:5.2f}; motor power: {:<5.2f} (self._power: {:5.2f}; pid output: {:5.2f})'.format(
-#                   self._orientation.label, _velocity, target_velocity, self._pid.setpoint, _motor_power, self._power, _pid_output))
+            _count = next(self._counter)
+            if self._motor.orientation is Orientation.SFWD and _count % 10 == 0:
+                self._log.info(Fore.YELLOW + 'set {} motor; velocity: {:5.2f}; targetv : {:5.2f}; PID setpoint: {:5.2f};'.format(self._orientation.label, _velocity, target_velocity, self._pid.setpoint) 
+                        + Style.BRIGHT + ' motor power: {:<5.2f}'.format(_motor_power) + Style.NORMAL + ' (self._power: {:5.2f}; pid output: {:5.2f})'.format(self._power, _pid_output))
             self._motor.set_motor_power(_motor_power)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -187,7 +195,6 @@ class PIDController(Component):
             if self.enabled:
                 self._log.warning('PID loop already enabled.')
             else:
-                self._message_bus.add_handler(Message, self.handle)
                 Component.enable(self)
 
 #EOF

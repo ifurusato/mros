@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -60,7 +60,7 @@ class Controller(Component):
         '''
         Responds to the Event contained within the Payload.
         '''
-        self._log.info('callback with payload {}'.format(payload.event.label))
+#       self._log.debug('callback with payload {}'.format(payload.event.label))
         if not self.enabled:
             self._log.warning('action ignored: controller disabled.')
             return

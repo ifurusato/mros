@@ -349,6 +349,13 @@ If tryOtherBus is True, this function will attempt to use the other bus if the T
         else:
             self.Print('ThunderBorg loaded on bus %d'.format(self.busNumber))
 
+    # 真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真
+    @property
+    def I2cAddress(self):
+        '''
+        For diagnostics only; not to be used directly.
+        '''
+        return self.i2cAddress
 
     # Motors  真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真真
 

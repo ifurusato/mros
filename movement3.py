@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
-# created:  2020-10-05
-# modified: 2021-08-07
-#
-# Tests a digital potentiometer controlling a servo bonnet.
-#
-#    sudo pip3 install adafruit-circuitpython-servokit
+# created:  2024-05-15
+# modified: 2024-05-19
 #
 
 import sys, time, traceback
@@ -26,11 +22,11 @@ except Exception:
     print("could not find library 'pytest': install with \"sudo pip3 install pytest\"")
     sys.exit(1)
 
-import hardware.ThunderBorg3
-from hardware.ThunderBorg3 import ThunderBorg, ScanForThunderBorg, SetNewAddress
-
 from core.rate import Rate
 from core.logger import Logger, Level
+import hardware.ThunderBorg3
+from hardware.ThunderBorg3 import ThunderBorg, ScanForThunderBorg, SetNewAddress
+from hardware.sound import Sound, Player
 
 _level = Level.INFO
 _log = Logger('test', _level)
@@ -71,6 +67,8 @@ try:
 
     _log.info('starting motor test...')
 
+    Player().play(Sound.BLIP)
+
     # go there...
     for power in map(lambda x: x/100.0, range(0, 50, 1)):
         set_power(power)
@@ -101,6 +99,8 @@ finally:
     if _tb2:
         _tb2.MotorsOff()
         _tb2.SetLeds(0.0, 0.0, 0.0) # black
+
+Player().play(Sound.BELL)
 
 _elapsed_ms = round(( dt.now() - _start_time ).total_seconds() * 1000.0)
 _log.info(Fore.YELLOW + 'complete: elapsed: {:d}ms'.format(_elapsed_ms))

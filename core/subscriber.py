@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -204,7 +204,6 @@ class Subscriber(Component, FiniteStateMachine):
                 _elapsed_ms = (dt.now() - _message.timestamp).total_seconds() * 1000.0
                 self._print_message_info('process message:', _message, _elapsed_ms)
 #           self._log.debug('creating task for processing message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.label))
-            self._log.info('🎂 creating task for processing message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.label))
             # create message processing task
             asyncio.create_task(self.process_message(_message), name='{}:process-message-{}'.format(self.name, _message.name))
 
@@ -424,7 +423,8 @@ class GarbageCollector(Subscriber):
             self._message_bus.consumed()
             _message.gc() # mark as garbage collected and don't republish
             if not _message.sent:
-                self._log.warning('garbage collected undelivered message: {}; event: {}; value: {}'.format(_message.name, _message.event.name, _message.value))
+                self._log.warning('garbage collected undelivered message: {}; event {} of group {}; value: {}'.format(
+                        _message.name, _message.event.name, _message.event.group.name, _message.value))
 #           elif self._message_bus.verbose:
 #           self._log.info('garbage collected message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.label))
         else:

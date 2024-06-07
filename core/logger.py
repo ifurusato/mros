@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2019-2021 by Murray Altheim. All rights reserved. This file is part
-# of the K-Series Robot Operating System (KROS) project, released under the MIT
+# of the MR01 Robot Operating System (MROS) project, released under the MIT
 # License. Please see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-01-14
-# modified: 2021-09-04
+# modified: 2024-05-19
 #
 
 import os, logging, math, traceback, threading
@@ -136,7 +136,7 @@ class Logger(object):
                     except OSError as e:
                         raise Exception('could not create ./log directory: {}'.format(e))
                 _ts = dt.utcfromtimestamp(dt.utcnow().timestamp()).isoformat().replace(':','_').replace('-','_').replace('.','_')
-                _filename = './log/kros-{}.csv'.format(_ts)
+                _filename = './log/mros-{}.csv'.format(_ts)
                 self.info("logging to file: {}".format(_filename))
                 # do we already have a file handler?
                 if globals.has('log-file-handler'): # use existing file handler

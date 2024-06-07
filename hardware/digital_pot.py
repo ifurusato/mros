@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-09-19
-# modified: 2021-07-21
+# modified: 2024-05-19
 #
 
 import sys, colorsys, traceback
@@ -32,6 +32,10 @@ class DigitalPotentiometer(Component):
     Optional min and max values will resort to the application configuration
     if not provided explicitly as arguments.
 
+    Note that because application of the potentiometer is not specified,
+    the default minimum and maximum ranges are set to zero. You must set
+    the ranges prior to use.
+
     :param config:     The application configuration.
     :param in_min:     (optional, int or float) Minimum input value.
     :param in_max:     (optional, int or float) Maximum input value.
@@ -39,16 +43,20 @@ class DigitalPotentiometer(Component):
     :param out_max:    (optional, int or float) Maximum output value.
     :param level:      The log level.
     '''
-    def __init__(self, config, in_min=None, in_max=None, out_min=None, out_max=None, level=Level.INFO):
+#   def __init__(self, config, i2c_address=None, in_min=None, in_max=None, out_min=None, out_max=None, level=Level.INFO):
+    def __init__(self, config, i2c_address=None, level=Level.INFO):
 #       super().__init__()
         self._log = Logger('digital-pot', level)
         Component.__init__(self, self._log, suppressed=False, enabled=True)
         if config is None:
             raise ValueError('no configuration provided.')
-        _cfg = config['kros'].get('hardware').get('digital_potentiometer')
+        _cfg = config['mros'].get('hardware').get('digital_potentiometer')
         # 0x18 for IO Expander, 0x0E for the potentiometer breakout
 #       self._i2c_addr = 0x0E
-        self._i2c_addr   = _cfg.get('i2c_address')
+        if i2c_address is not None:
+            self._i2c_addr = i2c_address
+        else:
+            self._i2c_addr = _cfg.get('i2c_address')
         self._pin_red    = _cfg.get('pin_red')
         self._pin_green  = _cfg.get('pin_green')
         self._pin_blue   = _cfg.get('pin_blue')
@@ -59,16 +67,14 @@ class DigitalPotentiometer(Component):
         self._max_value  = 3.3                     # maximum voltage (3.3v supply)
         self._brightness = _cfg.get('brightness')  # effectively max fraction of period LED will be on
         self._period = int(255 / self._brightness) # add a period large enough to get 0-255 steps at the desired brightness
-        # minimum and maximum analog values from IO Expander
-        _in_min          = _cfg.get('in_min') if in_min is None else in_min
-        _in_max          = _cfg.get('in_max') if in_max is None else in_max
-        self.set_input_limits(_in_min, _in_max)
-        # minimum and maximum scaled output values
-        _out_min         = _cfg.get('out_min') if out_min is None else out_min
-        _out_max         = _cfg.get('out_max') if out_max is None else out_max
-        self.set_output_limits(_out_min, _out_max)
+        # min/max analog values from IO Expander
+        self._in_min     = 0.0
+        self._in_max     = 3.3 # default 3.3 (v)
+        # min/max scaled output values
+        self._out_min    = 0.0
+        self._out_max    = 0.0
         # now configure IO Expander
-        self._log.info("🥝 configuring IO Expander...")
+        self._log.info("configuring IO Expander…")
         try:
             self._ioe = io.IOE(i2c_addr=self._i2c_addr)
             self._ioe.set_mode(self._pot_enc_a, io.PIN_MODE_PP)
@@ -81,22 +87,21 @@ class DigitalPotentiometer(Component):
             self._ioe.set_mode(self._pin_red,   io.PWM, invert=True)
             self._ioe.set_mode(self._pin_green, io.PWM, invert=True)
             self._ioe.set_mode(self._pin_blue,  io.PWM, invert=True)
-
 #           _result = self._ioe.get_bit(REG_ADCCON0, 7)
-            _result = self._ioe.get_bit(REG_PWMCON0, 6)
-            print('REG_PWMCON0: {}'.format(_result))
+#           print('REG_ADCCON0: {}'.format(_result))
+#           _result = self._ioe.get_bit(REG_PWMCON0, 6)
+#           print('REG_PWMCON0: {}'.format(_result))
 
         except FileNotFoundError:
             raise DeviceNotFound("unable to initialise potentiometer: no device found.")
         except Exception as e:
-#           self._log.warning(Fore.BLACK + "unable to initialise IO Expander: {}\n{}".format(e, traceback.format_exc()))
             raise DeviceNotFound("{} error initialising potentiometer: {}".format(type(e), traceback.format_exc()))
 
         self._log.info("running LED with {} brightness steps.".format(int(self._period * self._brightness)))
         self._log.info("ready.")
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_input_limits(self, in_min, in_max):
+    def set_input_range(self, in_min, in_max):
         '''
         Used to change the input minimum and maximum values.
         This accepts either int or float arguments.
@@ -106,7 +111,6 @@ class DigitalPotentiometer(Component):
         if not isinstance(in_min, float):
             raise ValueError('wrong type for in_min argument: {}'.format(type(in_min)))
         self._in_min = in_min
-
         if isinstance(in_max, int):
             in_max = float(in_max)
         if not isinstance(in_max, float):
@@ -115,7 +119,7 @@ class DigitalPotentiometer(Component):
         self._log.info('input range:\t{:>5.2f}-{:<5.2f}'.format(self._in_min, self._in_max))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_output_limits(self, out_min, out_max):
+    def set_output_range(self, out_min, out_max):
         '''
         Used to change the output minimum and maximum values.
         This accepts either int or float arguments.
@@ -187,6 +191,9 @@ class DigitalPotentiometer(Component):
 
             where e.g.:  a = 0.0, b = 1.0, min = 0, max = 330.
         '''
+        # we permit in_min to be zero, but none of the others
+        if self._in_max == 0.0 or self._out_max == 0.0:
+            raise Exception('input or output range not set.')
         return (( self._out_max - self._out_min ) * ( value - self._in_min ) / ( self._in_max - self._in_min )) + self._out_min
 
 
@@ -208,7 +215,7 @@ class DigitalPotentiometer(Component):
         if self.enabled:
             _count = 0
             while _count < 10 and not self.__reset():
-                self._log.info("[{:d}] waiting for digital potentiometer reset...")
+                self._log.info("[{:d}] waiting for digital potentiometer reset…")
                 time.sleep(0.1)
             Component.disable(self)
             self._log.debug('successfully disabled.')

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-04-27
-# modified: 2020-05-21
+# modified: 2024-05-19
 #
 # A jerk limiter that limits the rate of acceleration of a motor power.
 #
@@ -41,9 +41,9 @@ class JerkLimiter(Component):
     def __init__(self, config, orientation, suppressed=False, enabled=True, level=Level.INFO):
         self._log = Logger('jerk:{}'.format(orientation.label), level)
         Component.__init__(self, self._log, suppressed=suppressed, enabled=enabled)
-        _maximum_output = config['kros'].get('motor').get('motor_power_limit') # power limit to motor
+        _maximum_output = config['mros'].get('motor').get('motor_power_limit') # power limit to motor
         _minimum_output = _maximum_output * -1
-        _cfg = config['kros'].get('motor').get('jerk_limiter')
+        _cfg = config['mros'].get('motor').get('jerk_limiter')
         _jerk_tolerance_pc = _cfg.get('jerk_tolerance') # expressed as percent (0-100)
         if _jerk_tolerance_pc < 0 or _jerk_tolerance_pc > 100:
             raise ValueError('jerk tolerance must be expressed as a percentage value (0-100).')
@@ -83,27 +83,27 @@ class JerkLimiter(Component):
         else:
             # math.isclose(3, 15, abs_tol=0.03 * 255) # 3% on a 0-255 scale
             if isclose(current_value, target_value, abs_tol=self._tolerance): # if close to each other
-                self._log.info('🍋 limit current {:+06.2f} to target value {:+06.2f}.'.format(current_value, target_value))
+                self._log.info('limit current {:+06.2f} to target value {:+06.2f}.'.format(current_value, target_value))
                 pass
             elif target_value > current_value: # increasing ..........
                 if not isclose(current_value, target_value, abs_tol=self._tolerance):
                     # only allow the current value plus the jerk limit
                     _value = current_value + self._jerk_rate_limit
-                    self._log.info('🍏 limit current {:+06.2f} -> target value {:+06.2f}: value: {:5.2f}'.format(current_value, target_value, _value))
+                    self._log.info('limit current {:+06.2f} -> target value {:+06.2f}: value: {:5.2f}'.format(current_value, target_value, _value))
                 else:
-                    self._log.info(Fore.BLACK + '🍏 limit current {:+06.2f} -> target value {:+06.2f}.'.format(current_value, target_value))
+                    self._log.info(Fore.BLACK + 'limit current {:+06.2f} -> target value {:+06.2f}.'.format(current_value, target_value))
 
             else: # decreasing .......................................
                 if abs(current_value - target_value) > self._jerk_rate_limit:
                     # only allow the current value minus the jerk limit
                     _value = current_value - self._jerk_rate_limit
-                    self._log.info('🍎 limit current {:+06.2f} -> target value {:+06.2f}: value: {:5.2f}'.format(current_value, target_value, _value))
+                    self._log.info('limit current {:+06.2f} -> target value {:+06.2f}: value: {:5.2f}'.format(current_value, target_value, _value))
                 else:
-                    self._log.info(Fore.BLACK + '🍎 limit current {:+06.2f} -> target value {:+06.2f}.'.format(current_value, target_value))
+                    self._log.info(Fore.BLACK + 'limit current {:+06.2f} -> target value {:+06.2f}.'.format(current_value, target_value))
 
         # clip within save limits
         _value = -1.0 * self._clip(-1.0 * _value) if _value < 0.0 else self._clip(_value)
-        self._log.debug(Style.DIM + '🍆 limit current {:+06.2f} -> target value {:+06.2f}, returning '.format(current_value, target_value)
+        self._log.debug(Style.DIM + 'limit current {:+06.2f} -> target value {:+06.2f}, returning '.format(current_value, target_value)
                 + Fore.YELLOW + Style.NORMAL + 'value: {:5.2f}'.format(_value))
         return _value
 

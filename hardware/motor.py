@@ -18,7 +18,6 @@ from core.logger import Level, Logger
 from core.component import Component
 from core.orientation import Orientation
 from core.speed import Speed
-from core.message_bus import MessageBus
 from hardware.pid_ctrl import PIDController
 from hardware.slew import SlewLimiter
 from hardware.jerk import JerkLimiter
@@ -28,7 +27,7 @@ from hardware.velocity import Velocity
 class Motor(Component):
     '''
     Controls a motor that uses a Hall Effect encoder to determine the robot's
-    velocity and distance traveled. 
+    velocity and distance traveled.
 
     This Motor class takes an input as velocity (-100.0 to 100.0) which is
     pre-processed by a SlewLimiter (which buffers sudden changes to the target
@@ -38,7 +37,7 @@ class Motor(Component):
     are optional; when the PIDController is disabled a velocity-to-power
     dual-axis proportional interpolating function is used.
 
-    This uses the kros:motor: section of the configuration. The suppressed state
+    This uses the mros:motor: section of the configuration. The suppressed state
     of the slew limiter, PID controller and jerk limiter is initially set to the
     opposite of the enabled configuration value.
 
@@ -47,21 +46,19 @@ class Motor(Component):
     :param orientation: motor orientation
     :param level:       log level
     '''
-    def __init__(self, config, tb, message_bus, orientation, level=Level.INFO):
+    def __init__(self, config, tb, orientation, level=Level.INFO):
         if config is None:
             raise ValueError('null config argument.')
         if tb is None:
             raise ValueError('null thunderborg argument.')
         self._tb = tb
-        if not isinstance(message_bus, MessageBus):
-            raise ValueError('wrong type for message bus argument: {}'.format(type(message_bus)))
-        self._message_bus = message_bus
         self._orientation = orientation
         self._log = Logger('motor:{}'.format(orientation.label), level)
         Component.__init__(self, self._log, suppressed=False, enabled=True)
-        self._log.info('initialising {} motor with {} as motor controller...'.format(orientation.name, type(self._tb).__name__))
+        self._log.info(Fore.WHITE + 'initialising {} motor with {} at address 0x{:02X} as motor controller…'.format(
+                orientation.name, type(self._tb).__name__, self._tb.I2cAddress) + Style.RESET_ALL)
         # configuration ..............................................
-        _cfg = config['kros'].get('motor')
+        _cfg = config['mros'].get('motor')
         self._max_velocity       = _cfg.get('maximum_velocity') # a constant, the limit to motor velocity
         self._max_fwd_velocity   = self._max_velocity           # a variable, the limit to forward velocity
         self._log.info('max velocity:\t{:<5.2f}'.format(self._max_velocity))
@@ -84,6 +81,7 @@ class Motor(Component):
         self._slew_limiter       = None
         self._jerk_limiter       = None
         self.__velocity_lambdas  = {}
+        self._verbose            = True
         # slew limiter ...............................................
         _enable_slew_limiter     = _cfg.get('enable_slew_limiter')
         _suppress_slew_limiter   = not _enable_slew_limiter
@@ -97,7 +95,7 @@ class Motor(Component):
         # pid controller .............................................
         _enable_pid_controller   = _cfg.get('enable_pid_controller')
         _suppress_pid_controller = not _enable_pid_controller
-        self._pid_controller     = PIDController(config, self._message_bus, self, suppressed=_suppress_pid_controller,
+        self._pid_controller     = PIDController(config, self, suppressed=_suppress_pid_controller,
                 enabled=_enable_pid_controller, level=level)
         # jerk limiter ...............................................
         _enable_jerk_limiter     = _cfg.get('enable_jerk_limiter')
@@ -161,7 +159,7 @@ class Motor(Component):
 
         This is a function that alters the target velocity as a multiplier.
         '''
-        self._log.info(Fore.MAGENTA + '♈ adding \'{}\' lambda to motor;\t'.format(name) + ' type: {}'.format(type(lambda_function)))
+        self._log.info(Fore.GREEN + 'adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
         if name in self.__velocity_lambdas:
             self._log.warning('motor already contains a \'{}\' lambda.'.format(name))
         self.__velocity_lambdas[name] = lambda_function
@@ -172,10 +170,17 @@ class Motor(Component):
         Removes a named velocity multiplier from the dict of lambda functions.
         '''
         if name in self.__velocity_lambdas:
-            self._log.info(Fore.MAGENTA + '😨 removing \'{}\' lambda from motor...'.format(name))
+            self._log.info(Fore.GREEN + 'removing \'{}\' lambda from motor {}…'.format(name, self.orientation.name))
             del self.__velocity_lambdas[name]
         else:
             self._log.debug('motor did not contain a \'{}\' lambda.'.format(name))
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def has_velocity_multiplier(self, name):
+        '''
+        Returns true if a named velocity multiplier exists in the dict of lambda functions.
+        '''
+        return name in self.__velocity_lambdas
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _reset_velocity_multiplier(self):
@@ -183,6 +188,15 @@ class Motor(Component):
         Resets the velocity multiplier to None, i.e., no function.
         '''
         self.__velocity_lambdas.clear()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def remove_limiters(self):
+        '''
+        Used in testing to remove the slew and jerk limiters if they are by
+        default set in configuration.
+        '''
+        self._slew_limiter = None
+        self._jerk_limiter = None
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -243,24 +257,15 @@ class Motor(Component):
         '''
         return self.__target_velocity
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @target_velocity.setter
     def target_velocity(self, target_velocity):
         '''
         Set the target velocity of the Motor.
         '''
-        print(Fore.MAGENTA + Style.BRIGHT + 'set target velocity: {:5.2f} of {} motor.'.format(target_velocity, self._orientation.name) + Style.RESET_ALL) # TEMP
-        self._log.info('set target velocity: {:5.2f} of {} motor.'.format(target_velocity, self._orientation.name))
         if not isinstance(target_velocity, float):
             raise ValueError('expected float, not {}'.format(type(target_velocity)))
-        _count = next(self._counter)
-        if _count % 10 == 0:
-            if self._orientation is Orientation.PORT:
-                self._log.info('setting PORT motor velocity: ' + Fore.RED   + '{:5.2f}; '.format(target_velocity)
-                        + Fore.CYAN + 'power: ' + Fore.YELLOW + '{:5.2f} ➔ {:5.2f}'.format(self._last_driving_power, self.current_power))
-            elif self._orientation is Orientation.STBD:
-                self._log.info('setting STBD motor velocity: ' + Fore.GREEN + '{:5.2f}; '.format(target_velocity)
-                        + Fore.CYAN + 'power: ' + Fore.YELLOW + '{:5.2f} ➔ {:5.2f}'.format(self._last_driving_power, self.current_power))
-#       self._log.info('set target velocity: {:5.2f} of {} motor.'.format(target_velocity, self._orientation.name))
+#       self._log.info('set target velocity of motor {} to {:5.2f}.'.format(self._orientation.name, target_velocity))
         self.__target_velocity = target_velocity
         if self._indicator_callback:
             self._indicator_callback(target_velocity)
@@ -290,10 +295,12 @@ class Motor(Component):
         '''
         This callback is used to capture encoder steps.
         '''
-        if self._orientation is Orientation.PORT:
+        if self._orientation.side is Orientation.PORT:
             self.__steps = self.__steps + pulse
-        else:
+            print(Fore.RED + 'callback PORT: {} steps.'.format(self.__steps))
+        elif self._orientation.side is Orientation.STBD:
             self.__steps = self.__steps - pulse
+            print(Fore.GREEN + 'callback STBD: {} steps.'.format(self.__steps))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -357,24 +364,25 @@ class Motor(Component):
                 _current_target_velocity = self._slew_limiter.limit(self.velocity, _current_target_velocity)
 
             if len(self.__velocity_lambdas) > 0:
-                self._log.info(Fore.MAGENTA + 'processing {:d} lambdas...'.format(len(self.__velocity_lambdas)))
+#               self._log.info(Fore.MAGENTA + 'processing {:d} lambdas…'.format(len(self.__velocity_lambdas)))
                 for _name, _lambda in self.__velocity_lambdas.items():
-                    self._log.info(Fore.WHITE + '🌼 targ_vel: {}; {} lambda for {} motor; lambda type: {}; value: {}'.format(
-                            _current_target_velocity, _name, self._orientation.label, type(_lambda), _lambda))
-                    _current_target_velocity = _lambda * _current_target_velocity
+#                   _before_lambda_velocity = _current_target_velocity
+                    _current_target_velocity = _lambda(_current_target_velocity)
+#                   self._log.info(Fore.WHITE + Style.BRIGHT + 'before: {}; targ_vel: {}; {} lambda for {} motor; value: {}'.format(
+#                           _before_lambda_velocity, _current_target_velocity, _name, self._orientation.label, _lambda))
 
             # use velocity clipper as a sanity checker
             _current_target_velocity = self._velocity_clip(_current_target_velocity)
 
             # we now convert velocity to power, either by passing the target velocity to the PID controller (when active)
             # otherwise directly setting power to the motor via the proportional interpolator from the Speed Enum.
-#           self._log.info('setting {} target velocity to: {:<5.2f} (from {:5.2f})'.format(self._orientation.label, _current_target_velocity, self.__target_velocity))
-#           print('set {} tvel: {:<5.2f}'.format(self._orientation.label, _current_target_velocity ))
             if self._pid_controller.is_active: # via PID
+#               self._log.info('updating {} target velocity to: {:<5.2f} (from {:5.2f})'.format(self._orientation.label, _current_target_velocity, self.__target_velocity))
                 self._pid_controller.set_velocity(_current_target_velocity)
             else: # via Speed
 #               _power = Speed.get_proportional_power(_current_target_velocity)
 #               self.set_motor_power(_power)
+#               self._log.warning('pid controller is not active.')
                 raise Exception('unsupported direct speed control of motor.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -392,8 +400,7 @@ class Motor(Component):
         if target_power is None:
             raise ValueError('null target_power argument.')
         elif not self.enabled and target_power > 0.0: # though we'll let the power be set to zero
-            self._log.warning('motor enabled {}, ignoring setting of {:<5.2f}'.format(self.enabled, target_power))
-            return
+            raise Exception('motor {} not enabled.'.format(_motor.orientation.name))
 #       _current_power = self.current_power
         # even if disabled or suppressed, JerkLimiter still clips
 #       if self._jerk_limiter:
@@ -407,15 +414,32 @@ class Motor(Component):
         # temporary, just for safety
 #       _driving_power = self._power_clip(float(target_power * self.max_power_ratio))
 #       _driving_power = self._power_clip(_raw_driving_power)
+
         _driving_power = round(self._power_clip(float(target_power * self.max_power_ratio)), 4) # round to 4 decimal
-        if self._last_driving_power != _driving_power:
-            if self._orientation is Orientation.PORT:
-#               self._log.debug('power: target {:5.2f} converted to driving {:<5.2f} clipped to: {:5.2f}'.format(target_power, _raw_driving_power, _driving_power))
-                self._tb.SetMotor1(_driving_power)
-            else:
-#               self._log.debug('power: target {:5.2f} converted to driving {:<5.2f} clipped to: {:5.2f}'.format(target_power, _raw_driving_power, _driving_power))
-                self._tb.SetMotor2(_driving_power)
-            self._last_driving_power = _driving_power
+#       if self._last_driving_power != _driving_power:
+#           if self._orientation.side is Orientation.PORT:
+#               self._log.info(Fore.RED   + 'target power {:5.2f} converted to driving power {:<5.2f} for {} motor.'.format(target_power, _driving_power, self.orientation.name))
+#               self._tb.SetMotor1(_driving_power)
+#           elif self._orientation.side is Orientation.STBD:
+#               self._log.info(Fore.GREEN + 'target power {:5.2f} converted to driving power {:<5.2f} for {} motor.'.format(target_power, _driving_power, self.orientation.name))
+#               self._tb.SetMotor2(_driving_power)
+#           self._last_driving_power = _driving_power
+
+        if self._orientation.side is Orientation.PORT:
+#           self._log.info(Fore.RED   + 'target power {:5.2f} converted to driving power {:<5.2f} for {} motor.'.format(target_power, _driving_power, self.orientation.name))
+            self._tb.SetMotor1(_driving_power)
+        elif self._orientation.side is Orientation.STBD:
+#           self._log.info(Fore.GREEN + 'target power {:5.2f} converted to driving power {:<5.2f} for {} motor.'.format(target_power, _driving_power, self.orientation.name))
+            self._tb.SetMotor2(_driving_power)
+        self._last_driving_power = _driving_power
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def tb(self):
+        '''
+        For diagnostics only; not to be used directly.
+        '''
+        return self._tb
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -428,12 +452,12 @@ class Motor(Component):
         '''
         value = None
         count = 0
-        if self._orientation is Orientation.PORT:
+        if self._orientation is Orientation.PFWD or self._orientation is Orientation.PMID or self._orientation is Orientation.PAFT:
             while value == None and count < 20:
                 count += 1
                 value = self._tb.GetMotor1()
                 time.sleep(0.001)
-        else:
+        elif self._orientation is Orientation.SFWD or self._orientation is Orientation.SMID or self._orientation is Orientation.SAFT:
             while value == None and count < 20:
                 count += 1
                 value = self._tb.GetMotor2()
@@ -448,9 +472,9 @@ class Motor(Component):
         '''
         Stops the motor immediately.
         '''
-        if self._orientation is Orientation.PORT:
+        if self._orientation is Orientation.PFWD or self._orientation is Orientation.PMID or self._orientation is Orientation.PAFT:
             self._tb.SetMotor1(0.0)
-        elif self._orientation is Orientation.STBD:
+        elif self._orientation is Orientation.SFWD or self._orientation is Orientation.SMID or self._orientation is Orientation.SAFT:
             self._tb.SetMotor2(0.0)
         else:
             raise ValueError('unrecognised orientation.')
@@ -461,9 +485,9 @@ class Motor(Component):
         '''
         Stops the motor entirely.
         '''
-        if self._orientation is Orientation.PORT:
+        if self._orientation is Orientation.PFWD or self._orientation is Orientation.PMID or self._orientation is Orientation.PAFT:
             self._tb.SetMotor1Off()
-        elif self._orientation is Orientation.STBD:
+        elif self._orientation is Orientation.SFWD or self._orientation is Orientation.SMID or self._orientation is Orientation.SAFT:
             self._tb.SetMotor2Off()
         else:
             raise ValueError('unrecognised orientation.')

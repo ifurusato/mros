@@ -28,12 +28,11 @@ class MotorConfigurer():
     Configures either a ThunderBorg motor controller for a pair of motors.
 
     :param config:          the application configuration
-    :param message_bus:     the message bus handling event-laden messages
     :param i2c_scanner:     the I²C bus scanner
     :param motors_enabled:  an optional flag to enable motors (default false)
     :param level:           the logging level
     '''
-    def __init__(self, config, message_bus, i2c_scanner, motors_enabled=False, level=Level.INFO):
+    def __init__(self, config, i2c_scanner, motors_enabled=False, level=Level.INFO):
         self._log = Logger("motor-config", level)
         if config is None:
             raise ValueError('null configuration argument.')
@@ -42,7 +41,6 @@ class MotorConfigurer():
             self._log.info('importing speed enum values from configuration…')
             Speed.configure(self._config)
             Speed.print_configuration(self._log)
-        self._message_bus = message_bus
         if not isinstance(i2c_scanner, I2CScanner):
             raise ValueError('expected I2CScanner, not {}.'.format(type(i2c_scanner)))
         self._i2c_scanner = i2c_scanner
@@ -53,44 +51,45 @@ class MotorConfigurer():
         self._log.info('motors enabled?\t{}'.format(self._motors_enabled))
         self._max_power_ratio = None
         # Import the ThunderBorg library, then configure and return the motors
-        self._fore_tb = self._import_thunderborg(Orientation.FORE)
-#       self._mid_tb  = self._import_thunderborg(Orientation.MID)
+        self._fwd_tb = self._import_thunderborg(Orientation.FWD)
+        self._log.info(Fore.WHITE + 'configured FWD ThunderBorg at I2C address: 0x{:02X}'.format(self._fwd_tb.I2cAddress) + Style.RESET_ALL)
+        self._mid_tb  = None # self._import_thunderborg(Orientation.MID)
+#       self._log.info(Fore.WHITE + 'configured MID ThunderBorg at I2C address: 0x{:02X}'.format(self._mid_tb.I2cAddress) + Style.RESET_ALL)
         self._aft_tb  = self._import_thunderborg(Orientation.AFT)
+        self._log.info(Fore.WHITE + 'configured AFT ThunderBorg at I2C address: 0x{:02X}'.format(self._aft_tb.I2cAddress) + Style.RESET_ALL)
         if self._max_power_ratio is None: # this should have been set by the ThunderBorg code.
             raise ValueError('max_power_ratio not set.')
-
         self._enable_mid_motors = False
-
         # now import motors
         try:
             self._log.info('configuring motors…')
-            # PFOR "port-fore" .............................
-            self._pfor_motor = Motor(self._config, self._fore_tb, self._message_bus, Orientation.PFOR, level)
-            self._pfor_motor.max_power_ratio = self._max_power_ratio
-            # SFOR "starboard-fore" ........................
-            self._sfor_motor = Motor(self._config, self._fore_tb, self._message_bus, Orientation.SFOR, level)
-            self._sfor_motor.max_power_ratio = self._max_power_ratio
+            # PFWD "port-pwd" ..............................
+            self._pfwd_motor = Motor(self._config, self._fwd_tb, Orientation.PFWD, level)
+            self._pfwd_motor.max_power_ratio = self._max_power_ratio
+            # SFWD "starboard-fwd" .........................
+            self._sfwd_motor = Motor(self._config, self._fwd_tb, Orientation.SFWD, level)
+            self._sfwd_motor.max_power_ratio = self._max_power_ratio
             if self._enable_mid_motors:
-                # PMID "port-mid" ..............................
-                self._pmid_motor = Motor(self._config, self._mid_tb, self._message_bus, Orientation.PMID, level)
+                # PMID "port-mid" ..........................
+                self._pmid_motor = Motor(self._config, self._mid_tb, Orientation.PMID, level)
                 self._pmid_motor.max_power_ratio = self._max_power_ratio
-                # SMID "starboard-mid" .........................
-                self._smid_motor = Motor(self._config, self._mid_tb, self._message_bus, Orientation.SMID, level)
+                # SMID "starboard-mid" .....................
+                self._smid_motor = Motor(self._config, self._mid_tb, Orientation.SMID, level)
                 self._smid_motor.max_power_ratio = self._max_power_ratio
             else:
                 self._pmid_motor = None
                 self._smid_motor = None
             # PAFT "port-aft" ..............................
-            self._paft_motor = Motor(self._config, self._aft_tb, self._message_bus, Orientation.PAFT, level)
+            self._paft_motor = Motor(self._config, self._aft_tb, Orientation.PAFT, level)
             self._paft_motor.max_power_ratio = self._max_power_ratio
             # SAFT "starboard-aft" .........................
-            self._saft_motor = Motor(self._config, self._aft_tb, self._message_bus, Orientation.SAFT, level)
+            self._saft_motor = Motor(self._config, self._aft_tb, Orientation.SAFT, level)
             self._saft_motor.max_power_ratio = self._max_power_ratio
 
         except OSError as oe:
             self._log.error('failed to configure motors: {}'.format(oe))
-            self._pfor_motor = None
-            self._sfor_motor = None
+            self._pfwd_motor = None
+            self._sfwd_motor = None
             self._pmid_motor = None
             self._smid_motor = None
             self._paft_motor = None
@@ -106,14 +105,14 @@ class MotorConfigurer():
             self._reverse_motor_orientation   = _odo_cfg.get('reverse_motor_orientation')
             self._log.info('reverse motor orientation:   {}'.format(self._reverse_motor_orientation))
             # GPIO pins configured for A and B channels for each encoder
-            self._motor_encoder_sfor_a    = _odo_cfg.get('motor_encoder_sfor_a')
-            self._log.info('motor encoder sfor A: {:d}'.format(self._motor_encoder_sfor_a))
-            self._motor_encoder_sfor_b    = _odo_cfg.get('motor_encoder_sfor_b')
-            self._log.info('motor encoder sfor B: {:d}'.format(self._motor_encoder_sfor_b))
-            self._motor_encoder_pfor_a    = _odo_cfg.get('motor_encoder_pfor_a')
-            self._log.info('motor encoder pfor A: {:d}'.format(self._motor_encoder_pfor_a))
-            self._motor_encoder_pfor_b    = _odo_cfg.get('motor_encoder_pfor_b')
-            self._log.info('motor encoder pfor B: {:d}'.format(self._motor_encoder_pfor_b))
+            self._motor_encoder_sfwd_a    = _odo_cfg.get('motor_encoder_sfwd_a')
+            self._log.info('motor encoder sfwd A: {:d}'.format(self._motor_encoder_sfwd_a))
+            self._motor_encoder_sfwd_b    = _odo_cfg.get('motor_encoder_sfwd_b')
+            self._log.info('motor encoder sfwd B: {:d}'.format(self._motor_encoder_sfwd_b))
+            self._motor_encoder_pfwd_a    = _odo_cfg.get('motor_encoder_pfwd_a')
+            self._log.info('motor encoder pfwd A: {:d}'.format(self._motor_encoder_pfwd_a))
+            self._motor_encoder_pfwd_b    = _odo_cfg.get('motor_encoder_pfwd_b')
+            self._log.info('motor encoder pfwd B: {:d}'.format(self._motor_encoder_pfwd_b))
             if self._enable_mid_motors:
                 self._motor_encoder_smid_a    = _odo_cfg.get('motor_encoder_smid_a')
                 self._log.info('motor encoder smid A: {:d}'.format(self._motor_encoder_smid_a))
@@ -133,8 +132,8 @@ class MotorConfigurer():
             self._log.info('motor encoder paft B: {:d}'.format(self._motor_encoder_paft_b))
             # configure motor encoders…
             self._log.info('configuring motor encoders…')
-            self._configure_encoder(self._pfor_motor, Orientation.PFOR)
-            self._configure_encoder(self._sfor_motor, Orientation.SFOR)
+            self._configure_encoder(self._pfwd_motor, Orientation.PFWD)
+            self._configure_encoder(self._sfwd_motor, Orientation.SFWD)
             if self._enable_mid_motors:
                 self._configure_encoder(self._pmid_motor, Orientation.PMID)
                 self._configure_encoder(self._smid_motor, Orientation.SMID)
@@ -148,12 +147,12 @@ class MotorConfigurer():
     def _configure_encoder(self, motor, orientation):
         if self._reverse_encoder_orientation:
             pass # unsupported: swap port for starboard
-        if orientation is Orientation.PFOR:
-            _encoder_a = self._motor_encoder_pfor_a
-            _encoder_b = self._motor_encoder_pfor_b
-        elif orientation is Orientation.SFOR:
-            _encoder_a = self._motor_encoder_sfor_a
-            _encoder_b = self._motor_encoder_sfor_b
+        if orientation is Orientation.PFWD:
+            _encoder_a = self._motor_encoder_pfwd_a
+            _encoder_b = self._motor_encoder_pfwd_b
+        elif orientation is Orientation.SFWD:
+            _encoder_a = self._motor_encoder_sfwd_a
+            _encoder_b = self._motor_encoder_sfwd_b
         elif orientation is Orientation.PMID:
             _encoder_a = self._motor_encoder_pmid_a
             _encoder_b = self._motor_encoder_pmid_b
@@ -176,7 +175,7 @@ class MotorConfigurer():
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _import_thunderborg(self, orientation):
         if self._motors_enabled:
-            if orientation is Orientation.FORE:
+            if orientation is Orientation.FWD:
                 self._log.info('configure thunderborg & motors for {} orientation…')
                 _thunderborg_address = self._config['mros'].get('motor').get('thunderborg_fore_address')
             elif orientation is Orientation.MID:
@@ -184,18 +183,22 @@ class MotorConfigurer():
             elif orientation is Orientation.AFT:
                 _thunderborg_address = self._config['mros'].get('motor').get('thunderborg_aft_address')
             else:
-                raise Exception('expected FORE or AFT orientation.')
+                raise Exception('expected FWD or AFT orientation.')
+            self._log.info(Fore.MAGENTA + 'importing ThunderBorg for orientation {} at address 0x{:02X}…'.format(orientation.name, _thunderborg_address) + Style.RESET_ALL)
             try:
                 if self._i2c_scanner.has_address([_thunderborg_address]):
-                    self._log.info('importing ThunderBorg at address 0x[:02X]…'.format(_thunderborg_address))
+                    self._log.info('importing ThunderBorg at address 0x{:02X}…'.format(_thunderborg_address))
                     import hardware.ThunderBorg3 as ThunderBorg
                     self._log.info('successfully imported ThunderBorg.')
                     self._log.info('instantiating thunderborg…')
                     _tb = ThunderBorg.ThunderBorg(Level.INFO)  # create a new ThunderBorg object
+                    _tb.i2cAddress = _thunderborg_address
                 else:
                     raise Exception('unable to instantiate ThunderBorg [2].')
-                _tb.Init()                       # set the board up (checks the board is connected)
+                _tb.Init() # set the board up (checks the board is connected)
                 self._log.info('successfully instantiated ThunderBorg.')
+                self._log.info(Fore.MAGENTA + 'successfully instantiated ThunderBorg for orientation {} at address 0x{:02X}…'.format(
+                        orientation.name, _thunderborg_address) + Style.RESET_ALL)
                 if not _tb.foundChip:
                     boards = ThunderBorg.ScanForThunderBorg()
                     if len(boards) == 0:
@@ -219,32 +222,54 @@ class MotorConfigurer():
                 self._log.info('voltage in: {:>5.2f}V'.format(voltage_in))
         #       voltage_in = 20.5
                 # maximum motor voltage
-                voltage_out = 9.0
-                self._log.info('voltage out: {:>5.2f}V'.format(voltage_out))
-                if voltage_in < voltage_out:
+#               _motor_voltage = 9.0
+                _motor_voltage = self._config['mros'].get('motor').get('motor_voltage')
+                self._log.info('voltage out: {:>5.2f}V'.format(_motor_voltage))
+                if voltage_in < _motor_voltage:
                     raise OSError('cannot continue: battery voltage too low ({:>5.2f}V).'.format(voltage_in))
                 # set the power limits
-                if voltage_out > voltage_in:
+                if _motor_voltage > voltage_in:
                     self._max_power_ratio = 1.0
                 else:
-                    self._max_power_ratio = voltage_out / float(voltage_in)
+                    self._max_power_ratio = _motor_voltage / float(voltage_in)
+                    self._log.info(Fore.WHITE + Style.BRIGHT + 'voltage in: {}; motor voltage: {}; max_power_ratio: {}'.format(voltage_in, _motor_voltage, self._max_power_ratio))
                 # convert float to ratio format
-                self._log.info('battery level: {:>5.2f}V; motor voltage: {:>5.2f}V; maximum power ratio: {}'.format(voltage_in, voltage_out, \
+                self._log.info(Style.BRIGHT + 'battery level: {:>5.2f}V; motor voltage: {:>5.2f}V; maximum power ratio: {}'.format(voltage_in, _motor_voltage, \
                         str(Fraction(self._max_power_ratio).limit_denominator(max_denominator=20)).replace('/',':')))
                 return _tb
-
             except OSError as e:
                     raise Exception('unable to instantiate ThunderBorg [4].')
             except Exception as e:
                     raise Exception('unable to instantiate ThunderBorg [5].')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_thunderborg_leds(self, enable):
+        '''
+        Turns the motor controller LEDs on or off.
+        '''
+        _tb_fwd = self.get_thunderborg(Orientation.FWD)
+        _tb_mid = self.get_thunderborg(Orientation.MID)
+        _tb_aft = self.get_thunderborg(Orientation.AFT)
+        if _tb_fwd:
+            _tb_fwd.SetLedShowBattery(enable)
+            if not enable:
+                _tb_fwd.SetLeds(0.0, 0.0, 0.0) # black
+        if _tb_mid:
+            _tb_mid.SetLedShowBattery(enable)
+            if not enable:
+                _tb_mid.SetLeds(0.0, 0.0, 0.0) # black
+        if _tb_aft:
+            _tb_aft.SetLedShowBattery(enable)
+            if not enable:
+                _tb_aft.SetLeds(0.0, 0.0, 0.0) # black
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_thunderborg(self, orientation):
         '''
         Temporary: do not use this brain.
         '''
-        if orientation is Orientation.FORE:
-            return self._fore_tb
+        if orientation is Orientation.FWD:
+            return self._fwd_tb
         elif orientation is Orientation.MID:
             return self._mid_tb
         elif orientation is Orientation.AFT:
@@ -252,10 +277,10 @@ class MotorConfigurer():
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_motor(self, orientation):
-        if orientation is Orientation.PFOR:
-            return self._pfor_motor 
-        elif orientation is Orientation.SFOR:
-            return self._sfor_motor
+        if orientation is Orientation.PFWD:
+            return self._pfwd_motor 
+        elif orientation is Orientation.SFWD:
+            return self._sfwd_motor
         elif orientation is Orientation.PMID:
             return self._pmid_motor
         elif orientation is Orientation.SMID:
@@ -264,5 +289,10 @@ class MotorConfigurer():
             return self._paft_motor
         elif orientation is Orientation.SAFT:
             return self._saft_motor
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def close(self):
+        self.set_thunderborg_leds(True)
+        # anything else?
 
 #EOF

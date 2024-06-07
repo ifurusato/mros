@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-04-27
-# modified: 2021-08-12
+# modified: 2024-05-19
 #
 # A general purpose slew limiter that limits the rate of change of a value.
 #
@@ -40,11 +40,10 @@ class SlewLimiter(Component):
         self._millis  = lambda: int(round(time.time() * 1000))
         self._seconds = lambda: int(round(time.time()))
         # slew configuration
-        _cfg = config['kros'].get('motor').get('slew_limiter')
+        _cfg = config['mros'].get('motor').get('slew_limiter')
         self._minimum_output    = _cfg.get('minimum_output')
         self._maximum_output    = _cfg.get('maximum_output')
         self._log.info('minimum output: {:5.2f}; maximum output: {:5.2f}'.format(self._minimum_output, self._maximum_output))
-        self._use_elapsed_time  = _cfg.get('use_elapsed_time')
         self._default_slew_rate = SlewRate.from_string(_cfg.get('default_rate')) # default rate_limit, value change permitted per millisecond
         self.slew_rate = self._default_slew_rate
         self._slew_hysteresis   = _cfg.get('hysteresis')

@@ -1,13 +1,13 @@
 #}!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2021-07-29
-# modified: 2021-10-15
+# modified: 2024-05-19
 #
 
 from enum import Enum
@@ -196,9 +196,9 @@ class Speed(Enum):
         A static method that imports astern and ahead values from the provided
         YAML-sourced configuration.
 
-        This imports from 'kros:motor:speed'
+        This imports from 'mros:motor:speed'
         '''
-        _entries = config['kros'].get('motor').get('speed')
+        _entries = config['mros'].get('motor').get('speed')
         _astern_speeds = _entries.get('astern')
         _ahead_speeds  = _entries.get('ahead')
         for _speed in Speed:

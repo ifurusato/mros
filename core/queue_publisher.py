@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -45,7 +45,7 @@ class QueuePublisher(Publisher):
     '''
     def __init__(self, config, message_bus, message_factory, level=Level.INFO):
         Publisher.__init__(self, 'queue', config, message_bus, message_factory, suppressed=False, level=level)
-        _cfg = self._config['kros'].get('publisher').get('queue')
+        _cfg = self._config['mros'].get('publisher').get('queue')
         _loop_freq_hz  = _cfg.get('loop_freq_hz')
         self._log.info('queue publisher loop frequency: {:d}Hz'.format(_loop_freq_hz))
         self._publish_delay_sec = 1.0 / _loop_freq_hz
@@ -61,12 +61,14 @@ class QueuePublisher(Publisher):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def put(self, message):
-        if not self.is_active:
+        if not self.enabled:
+            self._log.warning('message {} ignored: queue publisher disabled.'.format(message.name))
+        elif not self.is_active:
             self._log.warning('message {} ignored: queue publisher inactive.'.format(message.name))
         else:
             self._queue.put(message)
-            self._log.info('put message \'{}\' ({}) into queue ({:d} {})'.format(
-                    message.event.label, message.name, self._queue.size, 'item' if self._queue.size == 1 else 'items'))
+#           self._log.debug('put message \'{}\' ({}) into queue ({:d} {})'.format(
+#                   message.event.label, message.name, self._queue.size, 'item' if self._queue.size == 1 else 'items'))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):
@@ -93,7 +95,7 @@ class QueuePublisher(Publisher):
                     await Publisher.publish(self, _message)
                     self._log.info('[{:03d}] published message '.format(_count)
                             + Fore.WHITE + '{} '.format(_message.name)
-                            + Fore.CYAN + 'for event \'{}\' with value: '.format(_message.event.label)
+                            + Fore.CYAN + 'for event \'{}\' with group \'{}\' and value: '.format(_message.event.label, _message.event.group.label)
                             + Fore.YELLOW + '{}'.format(_message.payload.value))
             await asyncio.sleep(self._publish_delay_sec)
         self._log.info('publisher loop complete.')

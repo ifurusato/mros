@@ -1,0 +1,4 @@
+#!/bin/sh
+
+mros.py -s -g
+

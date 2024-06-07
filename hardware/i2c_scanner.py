@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
@@ -42,7 +42,7 @@ class I2CScanner(object):
         self._hex_list = []
         self._bus      = None
         try:
-            self._log.info('initialising...')
+            self._log.info('initialising…')
             from smbus2 import SMBus
             bus_number = 1  # 1 indicates /dev/i2c-1
             self._bus = SMBus(bus_number)
@@ -102,7 +102,7 @@ class I2CScanner(object):
         to smbus.
         '''
         if len(self._int_list) == 0:
-            self._log.info('scanning I²C address bus...')
+            self._log.info('scanning I²C address bus…')
             device_count = 0
             if self._bus is not None:
                 for address in range(3, 128):
@@ -115,9 +115,10 @@ class I2CScanner(object):
                         device_count = device_count + 1
                     except IOError as e:
                         if e.errno != errno.EREMOTEIO:
-                            self._log.error('Error: {0} on address {1}'.format(e, hex(address)))
+                            self._log.debug('{0} on address {1}'.format(e, hex(address)))
+#                           self._log.warning('{0} on address {1}'.format(e, hex(address)))
                     except Exception as e: # exception if read_byte fails
-                        self._log.error('Error unk: {0} on address {1}'.format(e, hex(address)))
+                        self._log.error('{0} error on address {1}'.format(e, hex(address)))
                 self._bus.close()
                 self._bus = None
                 self._log.info("found {:d} I²C device(s).".format(device_count))
@@ -155,7 +156,7 @@ def main():
 
     level = Level.INFO
     log = Logger('main', level)
-    log.info('scanning for I²C devices...')
+    log.info('scanning for I²C devices…')
     scanner = I2CScanner(Level.INFO)
 
     _addresses = scanner.get_int_addresses()

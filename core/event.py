@@ -1,12 +1,12 @@
 #!/usr/bin/env python3 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-02-21
-# modified: 2021-10-31
+# modified: 2024-02-25
 #
 
 from enum import Enum
@@ -16,21 +16,42 @@ from core.speed import Speed
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Group(Enum):
-    NONE       =  0
-    SYSTEM     =  1
-    MACRO      =  2
-    GAMEPAD    =  3
-    STOP       =  4
-    BUMPER     =  5
-    INFRARED   =  6
-    VELOCITY   =  7
-    THETA      =  8
-    CHADBURN   =  9
-    BEHAVIOUR  = 10
-    CLOCK      = 11
-    EXPERIMENT = 12
-    REMOTE     = 13
-    OTHER      = 14
+    # name          n   label
+    NONE       = (  0, "none" )
+    SYSTEM     = (  1, "system" )
+    MACRO      = (  2, "macro" )
+    GAMEPAD    = (  3, "gamepad" )
+    STOP       = (  4, "stop" )
+    BUMPER     = (  5, "bumper" )
+    INFRARED   = (  6, "infrared" )
+    VELOCITY   = (  7, "velocity" )
+    THETA      = (  8, "theta" )
+    CHADBURN   = (  9, "chadburn" )
+    BEHAVIOUR  = ( 10, "behaviour" )
+    CLOCK      = ( 11, "clock" )
+    EXPERIMENT = ( 12, "experiment" )
+    REMOTE     = ( 13, "remote" )
+    OTHER      = ( 14, "other" )
+
+    def __new__(cls, *args, **kwds):
+        obj = object.__new__(cls)
+        obj._value_ = args[0]
+        return obj
+
+    # ignore the first param since it's already set by __new__
+    def __init__(self, num, label):
+        self._num       = num
+        self._label     = label
+
+    # properties ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+    @property
+    def num(self):
+        return self._num
+
+    @property
+    def label(self):
+        return self._label
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Event(Enum):
@@ -60,22 +81,44 @@ class Event(Enum):
     # gamepad events ........................................................................
     GAMEPAD                = ( 40, "gamepad",                  10,   Group.GAMEPAD )
 
+    A_BUTTON               = ( 41, "a-cross",                  10,   Group.GAMEPAD)
+    B_BUTTON               = ( 42, "b-circle",                 10,   Group.GAMEPAD)
+    X_BUTTON               = ( 43, "x-triangle",               10,   Group.GAMEPAD)
+    Y_BUTTON               = ( 44, "y-square",                 10,   Group.GAMEPAD)
+    
+    L1_BUTTON              = ( 45, "l1",                       10,   Group.GAMEPAD)
+    L2_BUTTON              = ( 46, "l2",                       10,   Group.GAMEPAD) # unassigned
+    R1_BUTTON              = ( 47, "r1",                       10,   Group.GAMEPAD) # unassigned
+    R2_BUTTON              = ( 48, "r2",                       10,   Group.GAMEPAD)
+
+    START_BUTTON           = ( 49, "start",                    10,   Group.GAMEPAD)
+    SELECT_BUTTON          = ( 50, "select",                   10,   Group.GAMEPAD)
+    HOME_BUTTON            = ( 51, "home",                     10,   Group.GAMEPAD)
+    DPAD_HORIZONTAL        = ( 52, "dpad-h",                   10,   Group.GAMEPAD)
+    DPAD_VERTICAL          = ( 53, "dpad-v",                   10,   Group.GAMEPAD)
+    
+    L3_VERTICAL            = ( 54, "l3-vert",                  10,   Group.GAMEPAD)
+    L3_HORIZONTAL          = ( 55, "l3-horz",                  10,   Group.GAMEPAD)
+    R3_VERTICAL            = ( 56, "r3-vert",                  10,   Group.GAMEPAD)
+    R3_HORIZONTAL          = ( 57, "r3-horz",                  10,   Group.GAMEPAD)
+
     # stopping and halting ..................................................................
-    STOP                   = ( 50, "stop",                     12,   Group.STOP )
-    HALT                   = ( 51, "halt",                     13,   Group.STOP )
-    BRAKE                  = ( 52, "brake",                    14,   Group.STOP )
-    STANDBY                = ( 53, "standby",                  15,   Group.STOP )
-    BUTTON                 = ( 54, "button",                   16,   Group.STOP )
+    STOP                   = ( 60, "stop",                     12,   Group.STOP )
+    HALT                   = ( 61, "halt",                     13,   Group.STOP )
+    BRAKE                  = ( 62, "brake",                    14,   Group.STOP )
+    STANDBY                = ( 63, "standby",                  15,   Group.STOP )
+    BUTTON                 = ( 64, "button",                   16,   Group.STOP )
+    EMERGENCY_STOP         = ( 65, "emergency-stop",            1,   Group.STOP )
 
     # remote ................................................................................
-    REMOTE_A               = ( 60, "remote A",                 10,   Group.REMOTE )
-    REMOTE_B               = ( 61, "remote B",                 10,   Group.REMOTE )
-    REMOTE_Y               = ( 62, "remote Y",                 10,   Group.REMOTE )
-    REMOTE_X               = ( 63, "remote X",                 10,   Group.REMOTE )
-    REMOTE_D               = ( 64, "remote D",                 10,   Group.REMOTE )
-    REMOTE_R               = ( 65, "remote R",                 10,   Group.REMOTE )
-    REMOTE_U               = ( 66, "remote U",                 10,   Group.REMOTE )
-    REMOTE_L               = ( 67, "remote L",                 10,   Group.REMOTE )
+    REMOTE_A               = ( 70, "remote A",                 10,   Group.REMOTE )
+    REMOTE_B               = ( 71, "remote B",                 10,   Group.REMOTE )
+    REMOTE_Y               = ( 72, "remote Y",                 10,   Group.REMOTE )
+    REMOTE_X               = ( 73, "remote X",                 10,   Group.REMOTE )
+    REMOTE_D               = ( 74, "remote D",                 10,   Group.REMOTE )
+    REMOTE_R               = ( 75, "remote R",                 10,   Group.REMOTE )
+    REMOTE_U               = ( 76, "remote U",                 10,   Group.REMOTE )
+    REMOTE_L               = ( 77, "remote L",                 10,   Group.REMOTE )
 
     # bumper ................................................................................
     BUMPER_MAST            = ( 110, "mast bumper",             40,   Group.BUMPER )
@@ -211,6 +254,11 @@ class Event(Enum):
     @staticmethod
     def is_system_event(event):
         return event.group is Group.SYSTEM
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def is_clock_event(event):
+        return event.group is Group.CLOCK
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod

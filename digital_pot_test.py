@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2021 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2020-10-05
-# modified: 2021-08-07
+# modified: 2024-05-17
 #
 # Tests the digital potentiometer.
 #
@@ -50,9 +50,8 @@ def test_digital_potentiometer():
         if _i2c_scanner.has_hex_address(['0x0E']):
             _log.info('using digital potentiometer...')
             # configure digital potentiometer for motor speed
-#           _pot = DigitalPotentiometer(_config, level=_level)
-            _pot = DigitalPotentiometer(_config, out_min=-180, out_max=180, level=_level)
-#            _pot.set_output_limits(-0.90, 0.90)
+            _pot = DigitalPotentiometer(_config, level=_level)
+            _pot.set_output_limits(-180, 180)
         else:
             raise Exception('no digital potentiometer available.')
 #           _log.info('using mock potentiometer...')

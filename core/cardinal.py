@@ -25,6 +25,7 @@ class Cardinal(Enum):
     SOUTHWEST = ( 5, 'south-west' )
     WEST      = ( 6, 'west' )
     NORTHWEST = ( 7, 'north-west' )
+    UNKNOWN   = ( 8, 'unknown' )
 
     # ignore the first param since it's already set by __new__
     def __init__(self, num, display):
@@ -67,6 +68,8 @@ class Cardinal(Enum):
             return Cardinal.SOUTH
         elif 112.5 <= degrees <= 157.5:
             return Cardinal.SOUTHEAST
+        else:
+            return Cardinal.UNKNOWN
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod

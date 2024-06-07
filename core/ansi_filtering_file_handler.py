@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2019-2021 by Murray Altheim. All rights reserved. This file is part
-# of the K-Series Robot Operating System (KROS) project, released under the MIT
+# of the MR01 Robot Operating System (MROS) project, released under the MIT
 # License. Please see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
