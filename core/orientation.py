@@ -7,13 +7,12 @@
 #
 # author:   Murray Altheim
 # created:  2019-12-23
-# modified: 2024-05-31
+# modified: 2024-06-07
 #
 # An enum for expressing different orientations.
 #
 
 from enum import Enum
-from hardware.color import Color
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Orientation(Enum):
