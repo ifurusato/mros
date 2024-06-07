@@ -17,7 +17,7 @@ from enum import Enum
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class SlewRate(Enum): # tested to 50.0 velocity:
     #                  num   ratio     pid    limit
-#   SLOWEST          = ( 0,  0.009,   0.16, 00.0001 ) # 5.1 sec
+    SLOWEST          = ( 0,  0.009,   0.16, 00.0001 ) # 5.1 sec
     SLOWEST          = ( 0,   0.02,   0.22, 00.0002 ) # 3.1 sec
     SLOWER           = ( 1,   0.05,   0.38, 00.0005 ) # 1.7 sec
     SLOW             = ( 2,   0.08,   0.48, 00.0010 ) # 1.3 sec
