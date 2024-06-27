@@ -14,6 +14,7 @@ import traceback
 import itertools
 import math, statistics
 from collections import deque
+from datetime import datetime as dt
 from colorsys import hsv_to_rgb
 from colorama import init, Fore, Style
 init()
@@ -39,6 +40,10 @@ OUT_MAX = math.pi        # maximum scaled output value
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Icm20948(Component):
+    NORTH_RADIANS = math.pi * 2.0
+    WEST_RADIANS  = math.pi / 2.0
+    SOUTH_RADIANS = math.pi
+    EAST_RADIANS  = math.pi * 1.5
     '''
     Wraps the functionality of an ICM20948 IMU as a compass. This includes
     optional trim adjustment, a calibration check, and optional console,
@@ -66,6 +71,10 @@ class Icm20948(Component):
         self._show_console       = _cfg.get('show_console')
         self._show_rgbmatrix11x7 = _cfg.get('show_rgbmatrix11x7')
         self._play_sound         = _cfg.get('play_sound') # if True, play sound to indicate calibration
+        if self._play_sound:
+            self._player = Player.instance()
+        else:
+            self._player = None
         # set up trim control ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._trim = 0.0
         if not self._adjust_trim:
@@ -85,11 +94,14 @@ class Icm20948(Component):
 #           else:
 #               raise Exception('no digital potentiometer available.')
         # add numeric display ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        self._low_brightness  = 0.15
-        self._high_brightness = 0.4
+        self._low_brightness    = 0.15
+        self._medium_brightness = 0.25
+        self._high_brightness   = 0.45
         if self._show_rgbmatrix11x7:
             self._matrix11x7 = Matrix11x7()
             self._matrix11x7.set_brightness(self._low_brightness)
+        self._cardinal_tolerance = _cfg.get('cardinal_tolerance') # tolerance to cardinal points (in radians)
+        self._log.info('cardinal tolerance: {:.8f}'.format(self._cardinal_tolerance))
         # general orientation ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._X = 0
         self._Y = 1
@@ -111,6 +123,7 @@ class Icm20948(Component):
         self._amax = None
         self._heading = 0
         self._mean_heading = 0
+        self._mean_heading_radians = 0.0
         self._accel = [0.0, 0.0, 0.0]
         self._gyro =  [0.0, 0.0, 0.0]
         self._include_accel_gyro = _cfg.get('include_accel_gyro')
@@ -129,6 +142,23 @@ class Icm20948(Component):
         deviation of a queue of values falls below a configured threshold.
         '''
         return self._is_calibrated
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def is_cardinal_aligned(self):
+        '''
+        Returns True if the mean heading is aligned within a 3° tolerance to
+        one of the four cardinal directions.
+        '''
+        if math.isclose(self._mean_heading_radians, Icm20948.NORTH_RADIANS, abs_tol=self._cardinal_tolerance):
+            return True
+        elif math.isclose(self._mean_heading_radians, Icm20948.WEST_RADIANS, abs_tol=self._cardinal_tolerance):
+            return True
+        elif math.isclose(self._mean_heading_radians, Icm20948.SOUTH_RADIANS, abs_tol=self._cardinal_tolerance):
+            return True
+        elif math.isclose(self._mean_heading_radians, Icm20948.EAST_RADIANS, abs_tol=self._cardinal_tolerance):
+            return True
+        else:
+            return False
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -159,6 +189,15 @@ class Icm20948(Component):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
+    def mean_heading_radians(self):
+        '''
+        Return the mean compass heading in radians (as a float).
+        '''
+        return self._mean_heading_radians
+
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
     def accelerometer(self):
         '''
         Return the IMU's accelerometer value as an x,y,z value.
@@ -185,10 +224,11 @@ class Icm20948(Component):
         Returns True or False upon completion (in addition to setting the
         class variable).
         '''
+        _start_time = dt.now()
         _rate = Rate(self._poll_rate_hz, Level.ERROR)
         _counter = itertools.count()
         _count = 0
-        _limit = 600
+        _limit = 1800 # 1 minute
         self._amin = list(self._imu.read_magnetometer_data())
         self._amax = list(self._imu.read_magnetometer_data())
         self._log.info(Fore.WHITE + Style.BRIGHT + '\n    calibrate by rotating sensor through a horizontal 360° motion…\n' + Style.RESET_ALL)
@@ -215,15 +255,16 @@ class Icm20948(Component):
                 self._log.error('{} encountered, exiting: {}\n{}'.format(type(e), e, traceback.format_exc()))
             _rate.wait()
 
+        _elapsed_ms = round(( dt.now() - _start_time ).total_seconds() * 1000.0)
         if self._rgbmatrix:
             RgbMatrix.set_all(self._rgbmatrix, 0, 0, 0)
             self._rgbmatrix.show()
         if self.is_calibrated:
-            self._log.info(Fore.GREEN + 'icm20948 is calibrated.' + Style.RESET_ALL)
+            self._log.info(Fore.GREEN + 'IMU calibrated: elapsed: {:d}ms'.format(_elapsed_ms))
             if self._play_sound:
-                Player().play(Sound.CHATTER_4)
+                self._player.play(Sound.CHATTER_4)
         else:
-            self._log.error(Fore.RED + 'icm20948 could not be calibrated.' + Style.RESET_ALL)
+            self._log.error('unable to calibrate IMU after elapsed: {:d}ms'.format(_elapsed_ms))
         return self.is_calibrated
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -240,54 +281,14 @@ class Icm20948(Component):
                 self._trim = self._pot.get_scaled_value(False)
                 if self._show_rgbmatrix5x5:
                     self._pot.set_rgb(self._pot.value)
-
             self.poll(_counter)
-
-#           try:
-#               self._heading = self._read_heading(self._amin, self._amax)
-#               # add to queue to calculate mean heading
-#               self._queue.append(self._heading)
-#               _stdev = statistics.stdev(self._queue)
-#               if _stdev < self._stability_threshold: # stable? then permanently flag as calibrated
-#                   self._is_calibrated = True
-#               self._mean_heading = statistics.mean(self._queue)
-#               _count = next(_counter)
-#               if _count % self._display_rate == 0: # display every 10th set of values
-#                   # convert to RGB
-#                   r, g, b = [int(c * 255.0) for c in hsv_to_rgb(self._heading / 360.0, 1.0, 1.0)]
-#                   if self._show_console:
-#                       if self._is_calibrated:
-#                           _style = Style.BRIGHT
-#                       else:
-#                           _style = Style.NORMAL
-#                       self._log.info(_style + "heading: {:3d}° / mean: {:3d}°;".format(self._heading, int(self._mean_heading))
-#                               + Style.NORMAL + " stdev: {:.2f}; trim: {:.2f}; color: #{:02X}{:02X}{:02X}".format(
-#                                   _stdev, self._trim, r, g, b) + Style.RESET_ALL)
-#                       if self._include_accel_gyro:
-#                           self._log.info(Fore.WHITE + "accel: {:5.2f}, {:5.2f}, {:5.2f}; gyro: {:5.2f}, {:5.2f}, {:5.2f}".format(*self._accel, *self._gyro) + Style.RESET_ALL)
-#                   if self._rgbmatrix:
-#                       if self._is_calibrated:
-#                           RgbMatrix.set_all(self._rgbmatrix, r, g, b)
-#                       else:
-#                           RgbMatrix.set_all(self._rgbmatrix, 40, 40, 40)
-#                       self._rgbmatrix.show()
-#                   if self._show_rgbmatrix11x7:
-#                       self._matrix11x7.clear()
-#                       self._matrix11x7.write_string('{:>3}'.format(self._heading), y=1, font=font3x5)
-#                       self._matrix11x7.show()
-#                       if self._is_calibrated:
-#                           self._matrix11x7.set_brightness(self._high_brightness)
-#                       else:
-#                           self._matrix11x7.set_brightness(self._low_brightness)
-#           except Exception as e:
-#               self._log.error('{} encountered, exiting: {}\n{}'.format(type(e), e, traceback.format_exc()))
-
             _rate.wait()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def poll(self, counter):
         '''
-        An individual call to the sensor. This is called in a loop by scan().
+        An individual call to the sensor. This is called in a loop by scan(),
+        but can be called independently.
 
         Note: calling this method will fail if not previously calibrated.
         '''
@@ -299,6 +300,7 @@ class Icm20948(Component):
             if _stdev < self._stability_threshold: # stable? then permanently flag as calibrated
                 self._is_calibrated = True
             self._mean_heading = statistics.mean(self._queue)
+            self._mean_heading_radians = math.radians(self._mean_heading)
             if next(counter) % self._display_rate == 0: # display every 10th set of values
                 # convert to RGB
                 r, g, b = [int(c * 255.0) for c in hsv_to_rgb(self._heading / 360.0, 1.0, 1.0)]
@@ -315,6 +317,10 @@ class Icm20948(Component):
                 if self._rgbmatrix:
                     if self._is_calibrated:
                         RgbMatrix.set_all(self._rgbmatrix, r, g, b)
+                        if self.is_cardinal_aligned():
+                            self._rgbmatrix.set_brightness(0.8)
+                        else:
+                            self._rgbmatrix.set_brightness(0.3)
                     else:
                         RgbMatrix.set_all(self._rgbmatrix, 40, 40, 40)
                     self._rgbmatrix.show()
@@ -324,11 +330,13 @@ class Icm20948(Component):
                     self._matrix11x7.show()
                     if self._is_calibrated:
                         self._matrix11x7.set_brightness(self._high_brightness)
+#                       self._matrix11x7.set_brightness(self._medium_brightness)
                     else:
                         self._matrix11x7.set_brightness(self._low_brightness)
 
         except Exception as e:
             self._log.error('{} encountered, exiting: {}\n{}'.format(type(e), e, traceback.format_exc()))
+
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _read_heading(self, amin, amax):
