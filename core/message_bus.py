@@ -135,12 +135,32 @@ class MessageBus(Component):
         '''
         _tasks = self.get_all_tasks()
         if len(_tasks) > 0:
-            self._log.debug('clearing {:d} outstanding tasks.'.format(len(_tasks)))
+            self._log.info('clearing {:d} outstanding tasks.'.format(len(_tasks)))
             for _task in _tasks:
-                if not _task.cancelled():
-                    _task.cancel()
-                if _task.done():
-                    _tasks.remove(_task)
+                _task_name = _task.get_name()
+                if 'shutdown' in _task_name:
+                    self._log.info('ignored call to cancel shutdown task.')
+                else:
+                    try:
+                        if not _task.cancelled():
+                            _task.cancel()
+                        if _task.done():
+                            _tasks.remove(_task)
+                        else:
+                            if 'cleanup' in _task_name:
+                                _tasks.remove(_task)
+                                self._log.info('removed cleanup task.')
+                            elif 'republish' in _task_name:
+                                _tasks.remove(_task)
+                                self._log.info('removed republication task.')
+                            else:
+                                _tasks.remove(_task)
+                                if not self.closing:
+                                    self._log.warning('removed unfinished task: {}'.format(_task))
+                    except CancelledError:
+                        self._log.warning('cancelled error: ignored.')
+                    except Exception as e:
+                        self._log.error('{} thrown cancelling task: {}'.format(type(e),e))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -168,7 +188,7 @@ class MessageBus(Component):
 
         IMPORTANT: This is an admin method and should not be considered part of the API.
         '''
-        return self._queue.empty()
+        return self._queue.empty
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     async def pop_queue(self):
@@ -177,7 +197,7 @@ class MessageBus(Component):
 
         IMPORTANT: This is an admin method and should not be considered part of the API.
         '''
-        if not self._queue.empty():
+        if not self._queue.empty:
             _message = await self._queue.get()
             self._queue.task_done()
 
@@ -456,18 +476,25 @@ class MessageBus(Component):
 
     # exception handling ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
-    def handle_exception(self, loop, context):
-        self._log.error('handle exception on loop: {}'.format(loop))
+    def _handle_exception(self, loop, context):
         # context["message"] will always be there; but context["exception"] may not
         _exception = context.get('exception', context['message'])
         if _exception != None:
-            self._log.error('caught {}: {}\n{}'.format(type(_exception), _exception, traceback.format_exc()))
+            _type = type(_exception)
+            if isinstance(_exception, SystemExit):
+                _code = _exception.code
+                if _code == 0:
+                    self._log.info('system exit.')
+                else:
+                    self._log.warning('caught system exit with code {}.'.format(_code))
+            else:
+                self._log.error('handle {} exception on loop: {} with context: {}\n{}'.format(type(_exception), loop, context, traceback.format_exc()))
         else:
-            self._log.error('caught exception: {}'.format(context.get('message')))
+            self._log.error('handling error: {}'.format(context.get('message')))
         if loop.is_running() and not loop.is_closed():
             asyncio.create_task(self.shutdown(loop), name='shutdown-on-exception')
-        else:
-            self._log.warning("loop already shut down.")
+        elif not isinstance(_exception, SystemExit):
+            self._log.warning("message bus already shut down: {}".format(_exception))
 
     # shutdown ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
@@ -566,7 +593,7 @@ class MessageBus(Component):
             for s in signals:
                 self._loop.add_signal_handler(
                     s, lambda s = s: asyncio.create_task(self.shutdown(s), name='shutdown'),)
-            self._loop.set_exception_handler(self.handle_exception)
+            self._loop.set_exception_handler(self._handle_exception)
             self._loop.create_task(self._start_consuming(), name='__event_loop__')
         if not self._loop.is_running():
             self._log.info('starting asyncio task loop…')
@@ -587,24 +614,28 @@ class MessageBus(Component):
         '''
         if self.closed:
             self._log.warning('already closed.')
-        elif self._closing:
-            self._log.warning('already closing.')
         elif not self.enabled:
             self._log.warning('already disabled.')
         else:
             Component.disable(self)
             self._log.info('disabling…')
             self._log.info('closing {:d} publishers…'.format(len(self._publishers)))
-            [publisher.close() for publisher in self._publishers]
+#           [publisher.close() for publisher in self._publishers]
+            for _publisher in self._publishers:
+                self._log.info(Style.DIM + "closing publisher '{}'".format(_publisher.name))
+                _publisher.close()
             self._publishers.clear()
             self._log.info('closing {:d} subscribers…'.format(len(self._subscribers)))
-            [subscriber.close() for subscriber in self._subscribers]
+#           [subscriber.close() for subscriber in self._subscribers]
+            for _subscriber in self._subscribers:
+                self._log.info(Style.DIM + "closing subscriber '{}'".format(_subscriber.name))
+                _subscriber.close()
             self._subscribers.clear()
             self.clear_tasks()
             self.clear_queue()
             _nil = self.__close_message_bus()
             time.sleep(0.1)
-            self._log.info('disabled.')
+            self._log.info('disabled: {}'.format(_nil))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -622,8 +653,8 @@ class MessageBus(Component):
             self._log.warning('already closing.')
         else:
             self._log.info('closing…')
-            Component.close(self) # will call disable()
             self._closing = True
+            Component.close(self) # will call disable()
             self._closing = False
             self._log.info('closed.')
 

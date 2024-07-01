@@ -332,13 +332,13 @@ class MacroPublisher(Publisher):
                     self.__callbacks.clear()
                     self._macro = None
 
-                # loop sleep ............................
+                # loop sleep  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 await asyncio.sleep(self._loop_delay_sec)
             else:
                 # we just wait quietly for a macro to show up.
                 await asyncio.sleep(self._quiescent_delay_sec)
 
-        # end of while loop ........................
+        # end of while loop ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._log.info(Fore.GREEN + 'macro publish loop complete.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -347,13 +347,13 @@ class MacroPublisher(Publisher):
         Publish a Message to the MessageBus based on the content of the
         current Statement.
         '''
-        self._log.info(Fore.BLUE + '🌜 statement is event.')
+        self._log.info(Fore.BLUE + 'statement is event.')
 
         _label = statement.label
         self._log.info(Fore.BLUE + 'label:    \t{}'.format(_label))
         _arguments = statement.arguments
 
-        # process required arguments .................................
+        # process required arguments ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         self._log.info(Fore.BLUE + 'arguments:\t{}'.format(_arguments))
         _event = statement.event
@@ -361,13 +361,13 @@ class MacroPublisher(Publisher):
             self._log.info(Fore.BLUE + 'event:    \t{}'.format(_event))
         _duration_ms = statement.duration_ms
         self._log.info(Fore.BLUE + 'duration: \t{}ms'.format(_duration_ms))
-        self._log.info(Fore.GREEN + 'event: ' 
-                + Fore.YELLOW + '{}'.format(_event.label)
+        self._log.info(Fore.GREEN + 'event: '
+                + Fore.YELLOW + '{}'.format(_event.name)
                 + Fore.GREEN  + '\tid: '
                 + Fore.YELLOW + '{}'.format(_label)
                 + Fore.MAGENTA + '\tduration: {:5.2f}ms'.format(_duration_ms))
 
-        # process optional arguments .................................
+        # process optional arguments  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _speed     = statement.speed
         self._log.info(Fore.BLUE + 'speed:    \t{}'.format(_speed))
         _direction = statement.direction

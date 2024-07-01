@@ -14,7 +14,7 @@
 #    sudo pip3 install adafruit-circuitpython-servokit
 #
 
-import sys
+import sys, traceback
 from enum import Enum
 import time
 
@@ -54,7 +54,8 @@ class Servo(object):
         self._clamp = lambda n: max(min(self._max, n), self._min)
 #       self._clamp = lambda n: max(min(self._max_range, n), 0)
         self._servo.actuation_range = self._max_range
-        self._angle = 0
+        self._angle = -1 + self._trim
+        self._verbose = False
         self._enabled = enabled
         if 'p' in self._name:
             self._color = Fore.RED
@@ -63,66 +64,100 @@ class Servo(object):
         self._code = self._get_code()
         self._log.info(Fore.CYAN + "{} servo set up on channel {}.".format(self._name, _channel) + Style.RESET_ALL)
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def report(self):
+        self._log.info(Fore.MAGENTA + '    servo {} angle set: {:d}°;\traw: {:4.2f}°;\tcalc: {:d}°'.format(self.name, self._angle, self.adjusted_angle, self.angle))
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
     def name(self):
         return self._name
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
     def trim(self):
         return self._trim
 
+#   # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 #   @property
-#   def servo(self):
-#       return self._servo
+#   def raw_angle(self):
+#       '''
+#       Returns the last angle set for this servo; zero if never set.
+#       This does not include the trim value.
+#       '''
+#       return self._servo.angle
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def adjusted_angle(self):
+        '''
+        Returns the servo's angle, scaled and trimmed.
+        '''
+        return int(( self._angle - self._trim ) / self._scale_factor )
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
     def angle(self):
         '''
         Returns the last angle set for this servo; zero if never set.
+        This includes the trim value.
         '''
-        return self._angle
+#       print('GET PROPERTY angle: {}; trimmed: {}'.format(self._angle, self._angle - self._trim))
+        return self._angle - self._trim
 
-    @property
-    def enabled(self):
-        return self._enabled
-
-    def set_enabled(self, enabled):
-        self._enabled = enabled
-
-    def enable(self):
-        self._enabled = True
-
-    def disable(self):
-        self._enabled = False
-
-#   def clamp(self, value):
-#       '''
-#       Return the clamp lambda function. This is the same for any servo.
-#       '''
-#       return self._clamp(value)
-
-    def center(self):
-        if self._enabled:
-            self._log.info(self._color + Style.BRIGHT + 'center {} servo position.'.format(self._name) + Style.RESET_ALL)
-            self.set_angle(0)
-
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_angle(self, angle):
+        '''
+        Sets the angle for this servo. This is redundant to the setter, used
+        solely for a Thread call.
+        '''
+#       print('SET angle {} from current {}'.format(angle, self._angle))
+        self.angle = angle 
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @angle.setter
+    def angle(self, angle):
         '''
         Set the angle of the servo to the specified value, generally a sweep of ±90°.
         This is scaled and clamped for safety.
         '''
         if self._enabled:
-            self._angle = int(self._clamp(angle) * self._scale_factor)
-            _target_angle = int(self._angle + self._trim)
+            _f_angle = (self._clamp(angle) * self._scale_factor) + self._trim
+            _rev_angle = int(( _f_angle - self._trim ) / self._scale_factor )
+            _angle = int(_f_angle)
+            if _angle != self._angle:
+                try:
+                    self._angle = _angle
+                    self._servo.angle = self._angle
+#                   self._log.info('@angle.setter: arg: {:d}; self._angle: {:d}; get: {:4.2f}; angle: {:d}; reverse: {:d}'.format(angle, self._angle, self._servo.angle, self.angle, self.adjusted_angle))
+                    if self._verbose:
+                        self._log.info(self._code + Fore.CYAN + ' for {} servo: processed to {:.2f}° (called with {}) '.format(self._name, self._angle, angle) 
+                                + Style.NORMAL + 'set to value: {:.2f}; trim: {:.2f}; min/max: {:.2f}/{:.2f}'.format(self._servo.angle, self._trim, self._min, self._max))
+                except OSError as e:
+                    self._log.error('{} encountered, exiting: {}\n{}'.format(type(e), e, traceback.format_exc()))
 
-#           self._angle = int(angle * self._scale_factor)
-#           _target_angle = int(self._clamp(self._angle) + self._trim)
+#       print('SETTER angle: {} to {}; GET: {}'.format(angle, self._angle, self.angle))
 
-            self._servo.angle = _target_angle
-            self._log.info(self._code + Fore.CYAN + ' for {} servo: processed to {:.2f}° (called with'.format(self._name, self._angle) 
-                    + Style.BRIGHT + ' {:.2f}°'.format(angle) 
-                    + Style.NORMAL + ') set to value: {:.2f}; trim: {:.2f}; min/max: {:.2f}/{:.2f}'.format(self._servo.angle, self._trim, self._min, self._max))
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def enabled(self):
+        return self._enabled
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def enable(self):
+        self._enabled = True
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def disable(self):
+        self._enabled = False
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def center(self):
+        if self._enabled:
+            self._log.info(self._color + 'center {} servo position.'.format(self._name) + Style.RESET_ALL)
+            self.angle = 0
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _get_code(self):
         if self._name == 'pfwd':
             return Fore.RED + '██▒' + Fore.YELLOW + '██▒' # ▒ 

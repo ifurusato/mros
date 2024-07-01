@@ -32,10 +32,10 @@ class AnalogPotentiometer(object):
         self._log = Logger('analog', level)
         if config is None:
             raise ValueError('no configuration provided.')
-        # configuration .........
+        # configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _config = config['mros'].get('hardware').get('analog_potentiometer')
         self._i2c_address = _config.get('i2c_address')
-        self._adc_pin = _config.get('adc_pin') # 7 oblique fore port
+        self._adc_pin = _config.get('adc_pin')
         self._log.info('analog potentiometer pin assignment: {:d};'.format(self._adc_pin))
         # configure IO Expander board
         _i2c_scanner = I2CScanner(config, level)
@@ -44,8 +44,8 @@ class AnalogPotentiometer(object):
             try:
                 self._log.info('instantiating IO Expander…')
                 self._ioe = io.IOE(i2c_addr=self._i2c_address)
-                self._ioe.set_mode(self._adc_pin, io.ADC)   # oblique fore port IR distance
-                self._ioe.set_adc_vref(3.3)  # input voltage of IO Expander, this is 3.3 on Breakout Garden
+                self._ioe.set_mode(self._adc_pin, io.ADC)
+                self._ioe.set_adc_vref(3.3)  # input voltage of IO Expander, this is 3.3v on Breakout Garden
                 self._log.info('ready.')
             except ImportError:
                 raise Exception('This script requires the pimoroni-ioexpander module\nInstall with: pip3 install --user pimoroni-ioexpander')
@@ -84,5 +84,19 @@ class AnalogPotentiometer(object):
         Return the raw, unprocessed values from the IO Expander.
         '''
         return self._ioe.input(self._adc_pin)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_black(self):
+        '''
+        Noop. For compatibility with the DigitalPotentiometer.
+        '''
+        pass
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_rgb(self, value):
+        '''
+        Noop. For compatibility with the DigitalPotentiometer.
+        '''
+        pass
 
 # EOF

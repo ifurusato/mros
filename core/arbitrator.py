@@ -71,17 +71,17 @@ class Arbitrator(Component):
         If the Event Group is CLOCK this will trigger the callback without
         arbitration.
         '''
-        self._log.debug('arbitrating payload: {}'.format(payload.event.label))
+        self._log.debug('arbitrating payload: {}'.format(payload.event.name))
         if self._suppressed:
             self._queue.clear()
         else:
             _start_time = dt.datetime.now()
             self._count = next(self._counter)
-#           self._log.debug('[{:03d}] putting payload: \'{}\' onto queue...'.format(self._count, payload.event.label))
+#           self._log.debug('[{:03d}] putting payload: \'{}\' onto queue...'.format(self._count, payload.event.name))
             if len(self._controllers) > 0:
                 await self._queue.put((payload.priority, payload))
 #               self._log.debug('payload \'{}\' put onto queue: {} element{}.'.format(
-#                       payload.event.label, self._queue.qsize(), '' if self._queue.qsize() == 1 else 's'))
+#                       payload.event.name, self._queue.qsize(), '' if self._queue.qsize() == 1 else 's'))
                 await self.trigger_callback()
                 _elapsed_ms = int((dt.datetime.now() - _start_time).total_seconds() * 1000)
 #               self._log.debug('{:4.2f}ms elapsed.'.format(_elapsed_ms))

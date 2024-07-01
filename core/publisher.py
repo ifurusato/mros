@@ -89,7 +89,8 @@ class Publisher(Component, FiniteStateMachine):
         as a rule should not be overridden by subclasses.
         '''
         await self._message_bus.publish_message(message)
-        await asyncio.sleep(0.05)
+        # the following isn't necessary as we expect calling methods to do this for us
+#       await asyncio.sleep(0.05) 
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def start(self):

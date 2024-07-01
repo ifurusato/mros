@@ -73,9 +73,11 @@ class DeQueue(object):
         '''
         Clears the contents of the queue.
         '''
-        self._queue.clear()
+        with self._queue.mutex:
+            self._queue.queue.clear()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
     def empty(self):
         '''
         Returns True if the queue is empty.
@@ -83,6 +85,7 @@ class DeQueue(object):
         return self.size == 0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
     def full(self):
         '''
         Returns True if the queue has reached its maximum length.
@@ -95,7 +98,7 @@ class DeQueue(object):
         Return the next item on the queue without getting it.
         This functions correctly for either a FIFO queue or a LIFO stack.
         '''
-        if self.empty():
+        if self.empty:
             raise Empty()
         if self._mode == DeQueue.FIFO:
             return self._backing_queue[0]
@@ -107,11 +110,11 @@ class DeQueue(object):
         '''
         Return the next item on the queue.
         '''
-        if self.empty():
+        if self.empty:
             raise Empty()
         if self._mode == DeQueue.LIFO:
             raise TypeError('poll() unsuppported in LIFO mode (stack), use pop() or the more general get().')
-        return self._queue.get(self.size-1)
+        return self._queue.get(self._queue.qsize() - 1)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def put_as_set(self, item):
@@ -138,7 +141,7 @@ class DeQueue(object):
         This has an additional feature over the default in that will ignore
         null arguments rather than raise an exception.
         '''
-        if self.full():
+        if self.full:
             raise Full()
         if item:
             self._queue.put(item)
@@ -157,7 +160,7 @@ class DeQueue(object):
         '''
         Get the next item from the queue.
         '''
-        if self.empty():
+        if self.empty:
             raise Empty()
         return self._queue.get()
 

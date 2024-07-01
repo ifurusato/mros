@@ -15,7 +15,7 @@
 # GamepadScan at bottom.
 #
 
-import os, sys, time, asyncio
+import os, sys
 from pathlib import Path
 import datetime as dt
 from enum import Enum
@@ -102,6 +102,7 @@ from hardware.gamepad_mapping import GamepadMapping
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Gamepad(Component):
 
+    _exit_on_y_btn = False
     _NOT_AVAILABLE_ERROR = 'gamepad device not found (not configured, paired, powered or otherwise available)'
 
     def __init__(self, config, message_bus, message_factory, suppressed=False, enabled=True, level=Level.INFO):
@@ -139,9 +140,9 @@ class Gamepad(Component):
         self._log.info('device path:        {}'.format(self._device_path))
         self._suppress_horiz_events = _cfg.get('suppress_horiz_events')
         self._log.info('suppress horizontal events: {}'.format(self._device_path))
-        self._gamepad_closed  = False
-        self._thread          = None
-        self._gamepad         = None
+        self._gamepad_closed = False
+        self._thread         = None
+        self._gamepad        = None
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def connect(self):
@@ -149,12 +150,17 @@ class Gamepad(Component):
         Scan for likely gamepad device, and if found, connect.
         Otherwise we raise an OSError.
         '''
-        self._log.info(Fore.YELLOW + 'connecting at device path {}…'.format(self._device_path))
+        self._log.info('connecting at device path {}…'.format(self._device_path))
         _scan = GamepadScan(self._device_path, self._level)
         if not _scan.check_gamepad_device():
             self._log.warning('connection warning: gamepad is not the most recent device (configured at: {}).'.format(self._device_path))
             raise ConnectionError('no gamepad device found.')
         self._connect()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def set_exit_on_Y_BUTTON():
+        Gamepad._exit_on_y_btn = True
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def device_exists(self):
@@ -220,16 +226,16 @@ class Gamepad(Component):
                 if self._gamepad is None:
                     raise Exception(Gamepad._NOT_AVAILABLE_ERROR + ' [gamepad no longer available]')
                 # loop and filter by event code and print the mapped label
-                self._log.info('starting gamepad loop…')
-                for event in self._gamepad.read_loop():
-                    _message = self._handleEvent(event)
+#               for _event in self._gamepad.read_loop():
+                async for _event in self._gamepad.async_read_loop():
+                    _message = self._handleEvent(_event)
                     if callback and _message:
                         await callback(_message)
 #                       await asyncio.sleep(0.02)
                     if not f_is_enabled():
-                        self._log.info('breaking from event loop.')
+                        self._log.debug('breaking from event loop.')
                         break
-                self._log.info(Fore.WHITE + 'exit gamepad loop.')
+                self._log.info('exit gamepad loop.')
             except KeyboardInterrupt:
                 self._log.info('caught Ctrl-C, exiting…')
                 __enabled = False
@@ -253,6 +259,7 @@ class Gamepad(Component):
                     self._log.info('error closing gamepad device: {}'.format(e))
                 finally:
                     __enabled = False
+                    self.disable()
                     self._gamepad_closed = True
 
             self._rate.wait()
@@ -267,8 +274,9 @@ class Gamepad(Component):
         '''
         _message = None
         _control = None
+#       self._log.debug("event type: EV_KEY; event: {}; value: {}".format(event.code, event.value))
         if event.type == ecodes.EV_KEY:
-            _control = GamepadMapping.get_by_code(self, event.code)
+            _control = GamepadMapping.get_by_code(self, event)
             if event.value == 1:
                 if event.code == GamepadMapping.A_BUTTON.code:
                     self._log.info(Fore.RED + "A Button")
@@ -280,8 +288,11 @@ class Gamepad(Component):
                     self._log.info(Fore.RED + "X Button")
                     _control = GamepadMapping.X_BUTTON
                 elif event.code == GamepadMapping.Y_BUTTON.code:
-                    self._log.info(Fore.RED + "Y Button")
+                    self._log.info(Fore.RED + "Y Button: exit? {}".format(Gamepad._exit_on_y_btn))
                     _control = GamepadMapping.Y_BUTTON
+                    if Gamepad._exit_on_y_btn:
+                        self._log.info(Style.BRIGHT + 'exit on Y Button…')
+                        sys.exit(0)
                 elif event.code == GamepadMapping.L1_BUTTON.code:
                     self._log.info(Fore.YELLOW + "L1 Button")
                     _control = GamepadMapping.L1_BUTTON
@@ -304,39 +315,41 @@ class Gamepad(Component):
                     self._log.info(Fore.MAGENTA + "Home Button")
                     _control = GamepadMapping.HOME_BUTTON
                 else:
-                    self._log.info(Fore.BLACK + "event type: EV_KEY; event: {}; value: {}".format(event.code, event.value))
+                    self._log.warning("unexpected event type: EV_KEY; event: {}; value: {}".format(event.code, event.value))
                 pass
         elif event.type == ecodes.EV_ABS:
-            _control = GamepadMapping.get_by_code(self, event.code)
-            if event.code == GamepadMapping.DPAD_HORIZONTAL.code:
-                if event.value == 1:
-                    self._log.info(Fore.CYAN + Style.BRIGHT + "D-Pad Horizontal(Right) {}".format(event.value))
-                elif event.value == -1:
-                    self._log.info(Fore.CYAN + Style.NORMAL + "D-Pad Horizontal(Left) {}".format(event.value))
-                else:
-                    self._log.info(Fore.BLACK + "D-Pad Horizontal(N) {}".format(event.value))
-            elif event.code == GamepadMapping.DPAD_VERTICAL.code:
-                if event.value == -1:
-                    self._log.info(Fore.CYAN + Style.NORMAL + "D-Pad Vertical(Up) {}".format(event.value))
-                elif event.value == 1:
-                    self._log.info(Fore.CYAN + Style.BRIGHT + "D-Pad Vertical(Down) {}".format(event.value))
-                else:
-                    self._log.info(Fore.BLACK + "D-Pad Vertical(N) {}".format(event.value))
-
+            _control = GamepadMapping.get_by_code(self, event)
+            if _control == GamepadMapping.DPAD_HORIZONTAL:
+                self._log.warning("D-Pad Horizontal(N) {}".format(event.value))
+                return None
+            elif _control == GamepadMapping.DPAD_LEFT:
+                self._log.info("D-Pad LEFT {}".format(event.value))
+            elif _control == GamepadMapping.DPAD_RIGHT:
+                self._log.info("D-Pad RIGHT {}".format(event.value))
+            elif _control == GamepadMapping.DPAD_VERTICAL:
+                self._log.warning("D-Pad Vertical(N) {}".format(event.value))
+                return None
+            elif _control == GamepadMapping.DPAD_UP:
+#               self._log.info("D-Pad UP {}".format(event.value))
+                pass
+            elif _control == GamepadMapping.DPAD_DOWN:
+#               self._log.info("D-Pad DOWN {}".format(event.value))
+                pass
             elif event.code == GamepadMapping.L3_VERTICAL.code:
                 self._log.debug(Fore.MAGENTA + "L3 Vertical {}".format(event.value))
 #               _control = GamepadMapping.R3_VERTICAL
             elif event.code == GamepadMapping.L3_HORIZONTAL.code:
-                self._log.debug(Fore.YELLOW + "L3 Horizontal {}".format(event.value))
+                self._log.info(Fore.YELLOW + "L3 Horizontal {}".format(event.value))
                 if self._suppress_horiz_events:
                     _control = None
             elif event.code == GamepadMapping.R3_VERTICAL.code:
                 self._log.debug(Fore.GREEN + "R3 Vertical {}".format(event.value))
 #               _control = GamepadMapping.R3_VERTICAL
             elif event.code == GamepadMapping.R3_HORIZONTAL.code:
-                self._log.debug(Fore.GREEN + "R3 Horizontal {}".format(event.value))
-                if self._suppress_horiz_events:
-                    _control = None
+#               self._log.info(Fore.GREEN + "R3 Horizontal {}".format(event.value))
+#               if self._suppress_horiz_events:
+#                   _control = None
+                pass
             else:
                 pass
         else:

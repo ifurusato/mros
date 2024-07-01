@@ -20,7 +20,6 @@ globals.init()
 from core.logger import Logger, Level
 from core.event import Event, Group
 from core.orientation import Orientation
-from core.speed import Speed
 from core.subscriber import Subscriber
 from hardware.color import Color
 from hardware.sound import Player, Sound
@@ -60,7 +59,7 @@ class RemoteControlSubscriber(Subscriber):
         if self._mros is None:
             raise Exception('mros not set in globals.')
         self._last_event = None
-        self._player = Player(level)
+        self._player = Player.instance()
         self._clear()
         self._log.info('ready.')
 
@@ -76,7 +75,7 @@ class RemoteControlSubscriber(Subscriber):
         _value = message.value
         message.acknowledge_sent()
         self._log.info('arbitrated message ' + Fore.WHITE + '{} '.format(message.name)
-                + Fore.CYAN + 'for event \'{}\' with value type: '.format(message.event.label)
+                + Fore.CYAN + 'for event \'{}\' with value type: '.format(message.event.name)
                 + Fore.YELLOW + '{}'.format(type(_value)))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -100,7 +99,7 @@ class RemoteControlSubscriber(Subscriber):
         if message.gcd:
             raise GarbageCollectedError('cannot process message: message has been garbage collected. [3]')
         _event = message.event
-        self._log.debug('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.label))
+        self._log.debug('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         _value = message.value
         if _event.num != self._last_event:
             if _event.num == Event.REMOTE_A.num:
@@ -128,7 +127,7 @@ class RemoteControlSubscriber(Subscriber):
                 self._remote_L(_value)
                 self.play_sound(Sound.CHATTER_5)
             else:
-                self._log.warning('unrecognised RGB event on message {}'.format(message.name) + ''.format(message.event.label))
+                self._log.warning('unrecognised RGB event on message {}'.format(message.name) + ''.format(message.event.name))
         self._last_event = _event.num
         await Subscriber.process_message(self, message)
         self._log.debug('post-processing message {}'.format(message.name))

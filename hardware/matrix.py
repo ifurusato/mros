@@ -50,6 +50,7 @@ class Matrices(object):
     :param level:         the log level
     '''
     def __init__(self, enable_port=True, enable_stbd=True, level=Level.INFO):
+        super().__init__()
         self._log = Logger("matrices", level)
         self._enabled = True
         if enable_port:

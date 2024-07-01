@@ -64,7 +64,7 @@ class System(object):
             * machine architecture
             * platform description
             * uname
-            * OS version 
+            * OS version
             * mac_ver
         '''
         try:
@@ -84,7 +84,7 @@ class System(object):
     def print_sys_info(self):
         self._log.info('mros:  state: ' + Fore.YELLOW + '{}  \t'.format(self._mros.state.name) \
                 + Fore.CYAN + 'enabled: ' + Fore.YELLOW + '{}'.format(self._mros.enabled))
-        # disk space ...................
+        # disk space ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._log.info('root file system:')
         _rootfs = psutil.disk_usage('/')
         _div = float(1<<30)
@@ -92,10 +92,10 @@ class System(object):
 #       self._log.info('  total:  \t' + Fore.YELLOW + '{:>6.2f}GB'.format(_rootfs.total / _div))
 #       self._log.info('  used:   \t' + Fore.YELLOW + '{:>6.2f}GB ({}%)'.format((_rootfs.used / _div), _rootfs.percent))
 #       self._log.info('  free:   \t' + Fore.YELLOW + '{:>6.2f}GB'.format(_rootfs.free / _div))
-        self._log.info('  total: ' + Fore.YELLOW + '{:>4.2f}GB'.format(_rootfs.total / _div) 
+        self._log.info('  total: ' + Fore.YELLOW + '{:>4.2f}GB'.format(_rootfs.total / _div)
                 + Fore.CYAN + '; used: ' + Fore.YELLOW + '{:>4.2f}GB ({}%)'.format((_rootfs.used / _div), _rootfs.percent)
                 + Fore.CYAN + '; free: ' + Fore.YELLOW + '{:>4.2f}GB'.format(_rootfs.free / _div))
-        # memory .......................
+        # memory ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _MB = 1000000
         _vm = psutil.virtual_memory()
         # svmem(total=n, available=n, percent=n, used=n, free=n, active=n, inactive=n, buffers=n, cached=n, shared=n)
@@ -117,7 +117,7 @@ class System(object):
         self._log.info('  total: ' + Fore.YELLOW + '{:>4.2f}MB'.format(_sw[0]/_MB)
                 + Fore.CYAN + '; used: ' + Fore.YELLOW + '{:>4.2f}MB ({:3.1f}%)'.format(_sw[1]/_MB, _sw[3])
                 + Fore.CYAN + '; free: ' + Fore.YELLOW + '{:>4.2f}MB'.format(_sw[2]/_MB))
-        # CPU temperature ..............
+        # CPU temperature ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         temperature = self.read_cpu_temperature()
         if temperature:
             self._log.info('cpu temperature:\t' + Fore.YELLOW + '{:5.2f}°C'.format(temperature))

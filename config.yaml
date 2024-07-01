@@ -16,10 +16,11 @@ mros:
     use_external_clock:                    True            # if True use external clock, ignoring loop delay value
     component:
         # publishers .......................................
-        enable_queue_publisher:            True            # publishes from globally-available queue
-        enable_clock_publisher:            True            # enable Clock Publisher
-        enable_sensor_array_publisher:    False            # enable SensorArray publisher
+        enable_queue_publisher:           False            # publishes from globally-available queue
+        enable_clock_publisher:           False            # enable Clock Publisher
+        enable_sensor_array_publisher:     True            # enable SensorArray publisher
         enable_remote_ctrl_publisher:      True            # enable Remote Control Publisher
+        enable_rtof_publisher:            False            # enable Ranging ToF publisher
         # subscribers ......................................
         enable_remote_ctrl_subscriber:     True            # handle remote control messages
         enable_system_subscriber:          True            # system events subscriber
@@ -36,22 +37,32 @@ mros:
         screen:
             pin:                             13            # enable/disable screen pin
             enabled:                       True            # default setting
+        radar:                                             # RCWL-0516 Microwave Radar Motion Sensor
+            i2c_address:                   0x19            # I²C address for the device
+            pin:                              9            # the IO Expander pin used for the analog pot
+        analog_potentiometer:                              # IO Expander-based analog potentiometer
+            i2c_address:                   0x18            # I²C address for the device
+            adc_pin:                         10            # the IO Expander pin used for the analog pot
         digital_potentiometer:                             # IO Expander-based RGB Potentiometer board
             i2c_address:                   0x0E            # I²C address for the device
             brightness:                     1.0            # brightness of the RGB LED (0.0-1.0)
             pin_red:                          1            # red pin
             pin_green:                        7            # green pin
             pin_blue:                         2            # blue pin
+        push_button:                                       # GPIO or IO Expander-based simple pushbutton
+            i2c_address:                   0x18            # I2C address of the IO Expander
+            source:                        'ioe'           # either 'gpio' or 'ioe'
+            pin:                             13            # the GPIO or IO Expander pin used
         bno055:
             i2c_device:                       1            # I2C device bus number, equivalent to '/dev/i2c-1'
             mode:                        'NDOF_MODE'       # Acc/Mag/Gyr (see table in BNO055Mode class)
 #           mode:                'NDOF_FMC_OFF_MODE'       # Acc/Mag/Gyr (Fast Mag Calib off)
 #           mode:                     'COMPASS_MODE'       # Acc/Mag no gyro
-            pitch_trim:                        0.00        # trim adjustment on pitch
-            roll_trim:                         0.00        # trim adjustment on roll
-            euler_heading_trim:               90.00        # trim adjustment on Euler heading
-            quat_heading_trim:                90.00        # trim adjustment on Quaternion heading
-            play_sound:                     True           # if True, play sound to indicate calibration
+            pitch_trim:                       0.00         # trim adjustment on pitch
+            roll_trim:                        0.00         # trim adjustment on roll
+            euler_heading_trim:              90.00         # trim adjustment on Euler heading
+            quat_heading_trim:               90.00         # trim adjustment on Quaternion heading
+            play_sound:                    True            # if True, play sound to indicate calibration
         icm20948:
             i2c_address:                   0x69            # I2C address (default 0x68)
             poll_rate_hz:                    50            # how often the IMU is polled
@@ -60,7 +71,8 @@ mros:
             adjust_trim:                  False            # if true, use pot for trim, otherwise used fixed value
             trim:                          0.15            # heading trim adjustment to set north
             queue_length:                   100            # length of heading data queue
-            stability_threshold:            5.0            # max standard deviation to determine stability
+            stability_threshold:              5.0          # max standard deviation to determine stability
+            cardinal_tolerance:       0.0698132            # tolerance to cardinal points (in radians)
             include_accel_gyro:            True            # if true, also poll accelerometer and gyroscope data
             play_sound:                    True            # if True, play sound to indicate calibration
         irq_clock:
@@ -71,21 +83,29 @@ mros:
             loop_delay:                       0.01         # main loop delay was sleep(0.01) or 1/100th second, or 10ms. 50ms is the delay for 20Hz, so 10ms is 5x 20Hz or 100Hz.
             suppress_horiz_events:         True            # ignore horizontal joystick events
             loop_freq_hz:                   100            # polling loop frequency (Hz)
+        rtof:
+            enabled:                       True
+    motion_controller:
+        afrs_max_ratio:                       0.36016      # speed ratio of inner wheels at max turn 
+        afrs_max_angle:                           45.0          # maximum AFRS turn angle
+    stop_handler:                                          # offloads stop handling for motor controller
+        stop_ratio:                           0.25         # multiplier for stopping lambda
+        halt_ratio:                           0.85         # multiplier for halting lambda
+        brake_ratio:                          0.93         # multiplier for braking lambda
     motor_controller:
         loop_freq_hz:                    20                # main loop delay in hz
-        accel_increment:                0.5                # normal incremental acceleration
-        decel_increment:                1.0                # normal incremental deceleration (note: not a negative number)
-        halt_rate:                 'FASTEST'               # slew rate for quick halt behaviour
-        brake_rate:                 'FASTER'               # slew rate for slower braking behaviour
-        max_velocity:                        10.0          # maximum motor velocity (0.0-100.0)
-        velocity_change_multiplier:        0.02            # multiplier for velocity change events
+        halt_rate:                    'SLOWEST'            # slew rate for quick halt behaviour
+        brake_rate:                   'SLOWEST'            # slew rate for slower braking behaviour
+        max_speed:                          100.0          # maximum motor speed (0.0-1.0)
+        scale_factor:                         5.0          # somewhat of a fudge factor that determines the maximum power sent to the motors (7 maxes them out at 0.9)
 #       spin_speed:                 'TWO_THIRDS'           # motor speed when spinning
 #       use_speed_indicator:              False            # publish RGB events for motor speed indication
-        verbose:                          False            # noisy messaging
+        verbose:                           True            # noisy messaging
     servo_controller:
-        rotate_angle:                      59.5            # angle used for rotate mode
-        max_range:                          135
-        scale_factor:                      0.64
+        rotate_angle:                        59.5          # angle used for rotate mode
+        spin_angle:                          90.0          # angle used for spin mode
+        max_range:                          135            # currently used as limiter in test
+        scale_factor:                         0.64
         # PFWD ................................
         servo-pfwd-channel:                   4
         servo-pfwd-trim:                     58
@@ -123,45 +143,49 @@ mros:
         wheel_offset:                        58            # offset from wheel centerline to steering axle
         steps_per_rotation:                2774.64         # encoder steps per wheel rotation
     motor:
-        maximum_velocity:                  80.0            # limit to settable motor velocity
+        speed_limit:                        5.0            # limit to settable motor speed
         motor_voltage:                       12            # the voltage rating of the motor
         motor_power_limit:                 0.90            # upper and lower (x -1) limit set on power sent to motor
-        enable_slew_limiter:               True            # initial enabled state for slew limiter (if disabled, no halt or brake)
         enable_pid_controller:             True            # initial enable state for PID controller, otherwise direct drive
+        enable_slew_limiter:               True            # initial enabled state for slew limiter (if disabled, no halt or brake)
+        slew_rate:                     'SLOWEST'           # slew rate for general motor changes: SLOWEST, SLOWER, SLOW, NORMAL, FAST, FASTER, FASTEST
         enable_jerk_limiter:              False            # initial enabled state for jerk limiter
         thunderborg_fore_address:          0x15            # I²C address for fore thunderborg motor controller
         thunderborg_mid_address:           0x00            # I²C address for mid thunderborg motor controller
         thunderborg_aft_address:           0x16            # I²C address for aft thunderborg motor controller
         odometry:
             enable_odometry:               True            # if true we enable motor encoders and odometry
-            motor_encoder_sfwd_a:             5            # stbd fwd A channel
-            motor_encoder_sfwd_b:             6            # stbd fwd B channel
-            motor_encoder_pfwd_a:            12            # port fwd A channel
-            motor_encoder_pfwd_b:            21            # port fwd B channel
+            motor_encoder_sfwd_a:            26            # stbd fwd A channel
+            motor_encoder_sfwd_b:            19            # stbd fwd B channel
+            motor_encoder_pfwd_a:            20            # port fwd A channel
+            motor_encoder_pfwd_b:            16            # port fwd B channel
             motor_encoder_smid_a:            00            # stbd mid A channel
             motor_encoder_smid_b:            00            # stbd mid B channel
             motor_encoder_pmid_a:            00            # port mid A channel
             motor_encoder_pmid_b:            00            # port mid B channel
-            motor_encoder_saft_a:            26            # stbd aft A channel
-            motor_encoder_saft_b:            19            # stbd aft B channel
-            motor_encoder_paft_a:            20            # port aft A channel
-            motor_encoder_paft_b:            16            # port aft B channel
-
-            reverse_motor_orientation:    False            # in case you wire up the motors backwards
-            reverse_encoder_orientation:  False            # in case you wire up the encoders backwards
+            motor_encoder_saft_a:             6            # stbd aft A channel
+            motor_encoder_saft_b:             5            # stbd aft B channel
+            motor_encoder_paft_a:            12            # port aft A channel
+            motor_encoder_paft_b:            21            # port aft B channel
+            reverse_encoder_sfwd:         False            # in case you wire up the encoders backwards
+            reverse_encoder_pfwd:         False            # ditto
+            reverse_encoder_smid:         False            # ditto
+            reverse_encoder_pmid:         False            # ditto
+            reverse_encoder_saft:         False            # ditto
+            reverse_encoder_paft:          True            # ditto
         pid_controller:
-            kp:                               0.09500      # proportional gain
-            ki:                               0.00000      # integral gain
+            kp:                               0.04400      # proportional gain (was 0.0950)
+            ki:                               0.01300      # integral gain
             kd:                               0.00000      # derivative gain
             minimum_output:                 -10.0          # lower output limit
             maximum_output:                  10.0          # upper output limit
             sample_freq_hz:                  20            # 20Hz equiv to 50ms/0.05s
             hyst_queue_len:                  20            # size of queue used for running average for hysteresis
         slew_limiter:
-            minimum_output:                 -90.0          # lower limit of permitted velocity output values
-            maximum_output:                  90.0          # upper limit of permitted velocity output values
-            default_rate:               'FASTEST'           # select value of enum: SLOWEST, SLOWER, SLOW, NORMAL, FAST, FASTER, FASTEST
-            hysteresis:                       2.0          # how close do we get to the target velocity?
+            minimum_output:                  -1.0          # lower limit of permitted speed output values
+            maximum_output:                   1.0          # upper limit, both should match motor_controller:scale_factor
+            default_rate:               'NORMAL'           # select value of enum: SLOWEST, SLOWER, SLOW, NORMAL, FAST, FASTER, FASTEST
+            hysteresis:                       2.0          # how close do we get to the target speed?
         jerk_limiter:
             jerk_tolerance:                  10            # percentage limit of permitted change per iteration
         speed:                                             # configured motor speeds for chadburn events
@@ -214,17 +238,21 @@ mros:
         queue:
             loop_freq_hz:                    20            # polling loop frequency (Hz)
         sensor_array: # note: these are IO Expander pins, not RPi pins
-            i2c_address:                   0x19            # I2C address of front IO Expander
+            fwd_i2c_address:               0x19            # I2C address of forward IO Expander
+            aft_i2c_address:               0x18            # I2C address of aft IO Expander
+            loop_freq_hz:                    20            # main loop delay in hz
             bsb_pin:                          1            # 1 bumper starboard bottom
             bst_pin:                          2            # 2 bumper starboard top
             bpb_pin:                          3            # 3 bumper port bottom
             bpt_pin:                          4            # 4 bumper port top
-            ofp_pin:                          7            # 7 oblique fore port IR distance sensor
-            ofs_pin:                          8            # 8 oblique fore starboard IR distance sensor
+            fop_pin:                          7            # 7 fore oblique port IR distance sensor
+            fos_pin:                          8            # 8 fore oblique starboard IR distance sensor
             wsa_pin:                         11            # 11 wheel starboard aft
             wsf_pin:                         12            # 12 wheel starboard fore
             wpa_pin:                         13            # 13 wheel port aft
             wpf_pin:                         14            # 14 wheel starboard fore
+            mast_pin:                        10            # IOE pin connected to mast IR (aft IOE)
+            oblique_trigger_cm:              20            # min distance trigger oblique IR
         gamepad:
             publish_delay_sec:                0.001        #
 #       integrated_front_sensor:
@@ -264,319 +292,10 @@ mros:
             shutdown_on_mast:             False            # if True then mast triggers shutdown
         remote:
             play_sound:                    True            # if True play sounds for events
+        stop:
+            nada:                         False            # nada
         system:
             exit_on_dire_event:            True            # if True exit if encountering a dire event
-
-# end of mros configuration ....................................................
-#
-# kros:
-#     exit_on_dire_event:                  False             # if True exit if encountering a dire event
-#     use_external_clock:                  False             # if True use external clock, ignoring loop delay value
-#     experimental:                                          # the list of experimental class names
-#         rgb_experiment:         'RgbExperiment'            # experiment 1
-#         rgb_random:                 'RgbRandom'            # experiment 2
-#         uart_experiment:       'UartExperiment'            # experiment 3
-#     component:                                             # enable specific publish/subscribe components
-#         enable_killswitch:               False             # kill switch
-#         enable_behaviours:               False             # enable BehaviourManager (Behaviours enabled individually)
-#         enable_experimental:             False             # enable ExperimentManager and load any Experiments
-#         # publishers .............................
-#         enable_ifs_publisher:            False             # enable Integrated Front Sensor publisher
-#         enable_remote_ctrl_publisher:     True             # enable Remote Control Publisher
-#         enable_ext_bumper_publisher:     False             # enable External Bumper Publisher, or:
-#         enable_mcu_bumper_publisher:     False             # enable MCU+UART Bumper Publisher, or:
-#         enable_gpio_bumper_publisher:    False             # enable standard GPIO Bumper publisher
-#         enable_event_publisher:          False             # keyboard robot simulator (required for running CLI)
-#         enable_battery_publisher:        False             # battery check publisher
-#         enable_velocity_publisher:       False             # velocity control potentiometer publisher
-#         enable_queue_publisher:           True             # publishes from globally-available queue
-#         enable_macro_publisher:          False             # macro processor/publisher (loads external macro scripts)
-#         enable_gamepad_publisher:         True             # gamepad event publisher
-#         # subscribers ............................
-#         enable_system_subscriber:         True             # system events subscriber
-#         enable_motor_subscriber:          True             # motor events subscriber
-#         enable_bumper_subscriber:        False             # bumper events subscriber
-#         enable_infrared_subscriber:      False             # infrared events subscriber
-#         enable_rgb_subscriber:            True             # display on RGB matrix
-#         enable_remote_ctrl_subscriber:    True             # handle remote control messages
-#         enable_omni_subscriber:          False             # test subscriber
-#         enable_macro_subscriber:         False             # macro subscriber
-#     behaviour:
-#         enable_avoid_behaviour:          False             # enable avoidance behaviour
-#         enable_roam_behaviour:           False             # enable roam behaviour
-#         enable_swerve_behaviour:         False             # enable swerve behaviour
-#         enable_moth_behaviour:           False             # enable moth behaviour
-#         enable_sniff_behaviour:          False             # enable sniff behaviour
-#         enable_idle_behaviour:           False             # enable idle behaviour
-#         avoid:
-#             min_distance:                20.0              # minimum distance in cm upon which we trigger avoidance behaviour
-#         roam:
-#             min_distance:                25.0              # minimum distance in cm
-#             max_distance:                60.0              # maximum distance in cm
-#             min_velocity:                 0.0              # minimum motor target velocity
-#             max_velocity:               100.0              # maximum motor target velocity
-#             cruising_speed:             'SLOW'             # cruising speed (recovery speed)
-#             cruise_wait_ticks:              3              # how many ticks to wait before cruising again
-#         swerve:
-#             reverse:                     True              # reverse effect of output function
-#             tolerance:                   20.0              # deadband tolerance as percentage
-#             multiplier:                   1.0              # multiplier on output function
-#             tick_modulo:                    2              # divider for frequency off external clock
-#         moth:
-#             anti_moth:                  False              # moth or anti-moth
-#         sniff:
-#             nada:                       False              # nada
-#         idle:
-#             idle_threshold_sec:            10              # how many seconds before we trigger an idle behaviour
-#             loop_freq_hz:                   1              # main loop delay in hz
-#         travel:
-#             accel_range_cm:              25.0              # the distance used for acceleration and deceleration (cm)
-#             cruising_speed:             'SLOW'             # cruising speed (recovery speed)
-#             turning_speed:              'HALF'             # speed necessary to create a curve
-#             targeting_speed:       'DEAD_SLOW'             # low velocity from which we're prepared to immediately halt upon reaching a step target
-#     message_bus:
-#         max_age_ms:                        20.0            # maximum age of a message before expiry
-#         publish_delay_sec:                 0.05            # publishing delay loop
-#         clip_event_list:                  False            # if True clip length of displayed event list
-#         clip_length:                         42            # max length of displayed event list
-#     hardware:
-#         status:
-#             led_pin:                         21            # pin connected to status LED
-#         digital_potentiometer:                             # IO Expander-based RGB Potentiometer board
-#             i2c_address:                   0x0E            # I²C address for the device
-#             brightness:                     1.0            # brightness of the RGB LED (0.0-1.0)
-#             pin_red:                          1            # red pin
-#             pin_green:                        7            # green pin
-#             pin_blue:                         2            # blue pin
-#             in_min:                         0.0            # minimum analog value from IO Expander
-#             in_max:                         3.3            # maximum analog value from IO Expander
-#             out_min:                      -80.0            # minimum scaled output value
-#             out_max:                       80.0            # maximum scaled output value
-#         analog_potentiometer:                              # analog potentiometer connected as voltage divider
-#             pin:                              8            # pin connected to wiper
-#             trim:                            -5            # ground trim if minimum value is not 0
-#             in_min:                           0            # minimum analog value from IO Expander
-#             in_max:                         330            # maximum analog value from IO Expander
-#             out_min:                       -1.0            # minimum scaled output value
-#             out_max:                        1.0            # maximum scaled output value
-#         battery:
-#             enable_battery_messaging:     False            # if True we enable low battery messages to be sent
-#             enable_channel_a_messaging:    True            # if True we enable low regulator on channel A messages to be sent
-#             enable_channel_b_messaging:   False            # if True we enable low regulator on channel B messages to be sent
-#             battery_channel:                  0            # AD channel for raw battery voltage
-#             five_volt_a_channel:              1            # AD channel for power supply A
-#             five_volt_b_channel:              2            # AD channel for power supply B
-#             raw_battery_threshold:        17.74            # raw and 5v regulator thresholds set from known measurements:
-# #           raw_battery_threshold:        11.00            # raw and 5v regulator thresholds set from known measurements:
-#             low_5v_threshold:              4.75            # really 4.82v
-#             loop_delay_sec:                  60            # sample loop delay (sec)
-#         irq_clock:
-#             pin:                             26            # pin connected to an MPU-based external clock source
-#         killswitch:
-#              pin:                             7            # pin connected to hardware kill switch
-#         rfm69_radio:
-#              frequency:            'FREQ_915MHZ'           # either "FREQ_868MHZ" or "FREQ_915MHZ" (default)
-#              spi_bus:                         0            # SPI bus (0 or 1, default 0)
-#              spi_device:                      0            # SPI device (0 or 1)
-#              network_id:                    100            # network identifier (common between transceivers)
-#              node_id:                         1            # source node identifier
-#              recipient_id:                    2            # target node identifier
-#              interrupt_pin:                  18            # BOARD pin number for interrupt (GPIO 24)
-#              reset_pin:                      29            # BOARD pin number for reset (GPIO 5)
-#              attempts:                        5            # number of connection attempts before giving up
-#              timeout_ms:                    250            # wait time until giving up
-#              promiscuous_mode:             True            # listen for any traffic?
-#              transmit_enabled:             True            # transmit or only receive?
-#     geometry:                                              # robot geometry (e.g., KR01)
-#         wheel_diameter:                    68.0            # wheel diameter (mm)
-#         wheelbase:                        160.0            # wheelbase (mm)
-#         steps_per_rotation:                 494            # encoder steps per wheel rotation
-#     motor:
-#         maximum_velocity:                  80.0            # limit to settable motor velocity
-#         motor_power_limit:                 0.80            # upper and lower (x -1) limit set on power sent to motor
-#         enable_slew_limiter:               True            # initial enabled state for slew limiter (if disabled, no halt or brake)
-#         enable_pid_controller:             True            # initial enable state for PID controller, otherwise direct drive
-#         enable_jerk_limiter:              False            # initial enabled state for jerk limiter
-#         thunderborg_address:               0x15            # I²C address for thunderborg motor controller
-#         motor_controller:
-#             loop_freq_hz:                    20            # main loop delay in hz
-#             accel_increment:                5.0            # normal incremental acceleration
-#             decel_increment:               -5.0            # normal incremental deceleration
-#             halt_rate:                  'FASTER'           # slew rate for quick halt behaviour
-#             brake_rate:                 'NORMAL'           # slew rate for slower braking behaviour
-#             spin_speed:             'TWO_THIRDS'           # motor speed when spinning
-#             use_speed_indicator:          False            # publish RGB events for motor speed indication
-#             verbose:                      False            # noisy messaging
-#         odometry:
-#             enable_odometry:               True            # if true we enable motor encoders and odometry
-#             motor_encoder_sfor_a:             5            # stbd fore A channel
-#             motor_encoder_sfor_b:             6            # stbd fore B channel
-#             motor_encoder_pfor_a:            12            # port fore A channel
-#             motor_encoder_pfor_b:            21            # port fore B channel
-# #           motor_encoder_smid_a:            00            # stbd mid A channel
-# #           motor_encoder_smid_b:            00            # stbd mid B channel
-# #           motor_encoder_pmid_a:            00            # port mid A channel
-# #           motor_encoder_pmid_b:            00            # port mid B channel
-#             motor_encoder_saft_a:            26            # stbd aft A channel
-#             motor_encoder_saft_b:            19            # stbd aft B channel
-#             motor_encoder_paft_a:            20            # port aft A channel
-#             motor_encoder_paft_b:            16            # port aft B channel
-#
-#             reverse_motor_orientation:    False            # in case you wire up the motors backwards
-#             reverse_encoder_orientation:  False            # in case you wire up the encoders backwards
-#         pid_controller:
-#             kp:                               0.09500      # proportional gain
-#             ki:                               0.00000      # integral gain
-#             kd:                               0.00000      # derivative gain
-#             minimum_output:                 -10.0          # lower output limit
-#             maximum_output:                  10.0          # upper output limit
-#             sample_freq_hz:                  20            # 20Hz equiv to 50ms/0.05s
-#             hyst_queue_len:                  20            # size of queue used for running average for hysteresis
-#             pot_ctrl:                     False            # if True enable potentiometer for setting PID terms
-#         slew_limiter:
-#             minimum_output:                 -90.0          # lower limit of permitted velocity output values
-#             maximum_output:                  90.0          # upper limit of permitted velocity output values
-#             default_rate:               'FASTER'           # select value of enum: SLOWEST, SLOWER, SLOW, NORMAL, FAST, FASTER, FASTEST
-#             hysteresis:                       2.0          # how close do we get to the target velocity?
-#             use_elapsed_time:              True            # used elapsed time or percentage
-#         jerk_limiter:
-#             jerk_tolerance:                  10            # percentage limit of permitted change per iteration
-#         speed:                                             # configured motor speeds for chadburn events
-#             astern:
-#                 MAXIMUM:                     -0.80
-#                 FULL:                        -0.50
-#                 THREE_QUARTER:               -0.40
-#                 TWO_THIRDS:                  -0.35
-#                 HALF:                        -0.30
-#                 ONE_THIRD:                   -0.25
-#                 SLOW:                        -0.20
-#                 DEAD_SLOW:                   -0.15
-#                 STOP:                         0.0
-#             ahead:
-#                 STOP:                         0.0
-#                 DEAD_SLOW:                    0.15
-#                 SLOW:                         0.20
-#                 ONE_THIRD:                    0.25
-#                 HALF:                         0.30
-#                 TWO_THIRDS:                   0.35
-#                 THREE_QUARTER:                0.40
-#                 FULL:                         0.50
-#                 MAXIMUM:                      0.80
-# #           astern:
-# #               MAXIMUM:                    -90.0
-# #               FULL:                       -80.0
-# #               THREE_QUARTER:              -60.0
-# #               TWO_THIRDS:                 -54.0
-# #               HALF:                       -40.0
-# #               SLOW:                       -33.0
-# #               DEAD_SLOW:                  -22.0
-# #               STOP:                         0.0
-# #           ahead:
-# #               STOP:                         0.0
-# #               DEAD_SLOW:                   20.0
-# #               SLOW:                        33.0
-# #               HALF:                        40.0
-# #               TWO_THIRDS:                  55.0
-# #               THREE_QUARTER:               60.0
-# #               FULL:                        80.0
-# #               MAXIMUM:                     90.0
-#     io_expander: # note: these are IO Expander pins, not RPi pins
-# #       psid_ir_pin:                          8            # pin connected to port side infrared
-#         port_ir_pin:                         10            # pin connected to port infrared
-#         cntr_ir_pin:                         11            # pin connected to center infrared
-#         stbd_ir_pin:                          9            # pin connected to starboard infrared
-# #       ssid_ir_pin:                          7            # pin connected to starboard side infrared
-# #       port_bmp_pin:                         6            # pin connected to port bumper
-# #       cntr_bmp_pin:                         4            # pin connected to center bumper
-# #       stbd_bmp_pin:                         5            # pin connected to starboard bumper
-# #       port_moth_pin:                       13            # pin connected to port moth sensor
-# #       stbd_moth_pin:                       14            # pin connected to starboard moth sensor
-#     integrated_front_sensor:
-#         use_analog_potentiometer:         False            # use analog potentiometer to adjust distance setting
-#         use_digital_potentiometer:        False            # use digital potentiometer to adjust distance setting
-#         ignore_duplicates:                False            # don't fire messages for duplicate events
-#         # the analog sensor distances (raw or cm) used as event trigger thresholds:
-#         conversion_exponent:                  1.34         # 1.27-1.35 the constant used for infrared distance conversion
-#         fudge_factor:                        -2.00         # slight non-linear adjustment for accuracy
-#         cntr_raw_min_trigger:                40            # below this raw value we don't execute callback on center IR
-#         oblq_raw_min_trigger:                60            # below this raw value we don't execute callback on PORT & STBD IRs
-#         side_raw_min_trigger:                60            # below this raw value we don't execute callback on side IRs
-#         cntr_trigger_distance_cm:            50.0          # center analog IR sensor max distance before triggering
-#         oblq_trigger_distance_cm:            70.0          # port or starboard oblique analog IR sensor max distance before triggering
-#         side_trigger_distance_cm:            70.0          # port or starboard side analog IR sensor max distance before triggering
-#         bumper_threshold_cm:                 15            # below this value we treat the infrared like a bumper
-# #   gamepad:
-# #       enabled:                           True
-# #       device_path:         '/dev/input/event5'           # the path to the bluetooth gamepad on the pi (see find_gamepad.py)
-# #       loop_delay:                           0.01         # main loop delay was sleep(0.01) or 1/100th second, or 10ms. 50ms is the delay for 20Hz, so 10ms is 5x 20Hz or 100Hz.
-# #       loop_freq_hz:                       100            # polling loop frequency (Hz)
-#     publisher:
-#         integrated_front_sensor:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#             release_on_startup:           False            # if true, release when initially enabling
-#         bumper:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#             one_shot:                     False            # if True then require reset before retriggering
-#             debounce_ms:                     50            # switch debounce time in milliseconds
-#             bmp_port_pin:                    21            # GPIO pin connected to port bumper
-#             bmp_cntr_pin:                    20            # GPIO pin connected to center bumper
-#             bmp_stbd_pin:                    16            # GPIO pin connected to starboard bumper
-#             bmp_paft_pin:                    26            # GPIO pin connected to port aft digital infrared sensor
-#             bmp_mast_pin:                     8            # GPIO pin connected to mast digital infrared sensor
-#             bmp_saft_pin:                    19            # GPIO pin connected to starboard aft digital infrared sensor
-#         external_clock:
-#             pin:                              6            # pin connected to external clock source from Itsy Bitsy RP2040
-#             loop_freq_hz:                   150            # main loop delay in hz
-#         external_bumper:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#             ack_pin:                         21            # GPIO pin connected to acknowledge pin (white)
-#             int_pin:                         26            # GPIO pin connected to interrupt pin (grey)
-#             d0_pin:                          20            # GPIO pin connected to data 0 pin (red) was 20 or 6
-#             d1_pin:                          16            # GPIO pin connected to data 1 pin (green)
-#             d2_pin:                          19            # GPIO pin connected to data 2 pin (blue)
-#         mcu_bumper:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#         queue:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#         macro:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#             quiescent_loop_freq_hz:           5            # quiescent loop frequency (Hz)
-#             wait_limit_ms:                 5000            # the longest we will ever wait for anything (because we are impatient)
-#             macro_path:                  'macro'           # the location of the macros to load on startup
-#             load_macros:                  False            # if True load *.py as macros from ./macro/ directory
-#         remote:
-#             loop_freq_hz:                    20            # polling loop frequency (Hz)
-#             d0_pin:                          16            # GPIO 16 pin for bit 0
-#             d1_pin:                          20            # GPIO 20 pin for bit 1
-#             d2_pin:                          21            # GPIO 21 pin for bit 2
-#     hihp:
-#         ack_pin:                             21            # GPIO pin connected to acknowledge pin (white)
-#         int_pin:                             26            # GPIO pin connected to interrupt pin (grey)
-#         d0_pin:                              20            # GPIO pin connected to data 0 pin (red) was 20 or 6
-#         d1_pin:                              16            # GPIO pin connected to data 1 pin (green)
-#         d2_pin:                              19            # GPIO pin connected to data 2 pin (blue)
-#         d3_pin:                              13            # GPIO pin connected to data 3 pin (orange)
-#     subscriber:
-#         clock:
-#             nada:                         False            # nada
-#         bumper:
-#             shutdown_on_mast:             False            # if True then mast triggers shutdown
-#     mock:
-#         potentiometer:
-#             loop_delay_sec:                   0.05         # loop delay
-#         velocity_publisher:
-#             loop_delay_sec:                   0.05         # loop delay
-#             hysteresis:                       3.0          # hysteresis near zero
-#         event_publisher:
-#             ir_init_value:                  100            # initial value of mocked center IR
-#             ir_min:                          10            # minimum center IR value
-#             ir_max:                         200            # maximum center IR value
-#             ir_incr:                         20            # IR step increment
-#             publish_delay_sec:                0.01         # delay after IFS event
-#             noop_loop_delay_sec:              0.01         # delay on noop loop
-#     arguments:                                             # CLI arguments are copied here
-#         nada:                               False          # nada
-#         mock_enabled:                       False          # permit mocks if real hardware is unavailable
 
 pi:
     disable_leds:                           False          # disable and re-enable Pi LEDs during operation?
@@ -591,14 +310,15 @@ devices:
     0x10: 'PA1010D GPS'
     0x15: 'ThunderBorg - Fwd'
     0x16: 'ThunderBorg - Aft'
-    0x18: 'IO Expander'
+    0x18: 'IO Expander - Aft'
+    0x19: 'IO Expander - Fwd'
     0x22: 'Picon Zero 1'
     0x23: 'Picon Zero 2'
     0x28: 'BNO055'
     0x29: 'VL53L1X'
     0x36: 'UltraBorg'
     0x39: 'HT0740'
-    0x40: 'INA260' # port?
+    0x40: 'Servo Bonnet'
     0x41: 'INA260' # stbd?
     0x48: 'ADS1015'
     0x69: 'ICM20948'
@@ -624,212 +344,5 @@ devices:
 # 50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 # 60: -- -- -- -- -- -- -- -- -- 69 -- -- -- -- -- --
 # 70: -- -- -- -- 74 -- -- 77
-
-        # GPIO pins configured for A1, B1, A2 and B2
-#       sample_rate: 10                          # how many pulses per encoder measurement?
-#       accel_loop_delay_sec: 0.10
-#       pid-controller:
-#           kp:                 0.09500          # proportional gain
-#           ki:                 0.00000          # integral gain
-#           kd:                 0.00000          # derivative gain
-#           min_output:           -10.0          # lower output limit
-#           max_output:            10.0          # upper output limit
-#           enable_slew:          False
-#           sample_freq_hz:          20
-#           hyst_queue_len:          20          # size of queue used for running average for hysteresis
-#           pot_ctrl:             False          # if True enable potentiometer for setting PID terms
-#   ticker:
-#       loop_freq_hz:            0.05            # main loop frequency
-#    current:
-#        port_address:  0x40                      # I2C address for port INA260
-#        stbd_address:  0x41                      # I2C address for starboard INA260
-#    external_clock:
-#        pin:           5                         # input pin from external source
-#        loop_freq_hz: 20                         # main loop frequency
-#    clock:
-#        loop_freq_hz: 20                         # main loop frequency
-#        tock_modulo:  20                         # modulo value for tock frequency
-#        enable_trim:  True                       # when true enable auto-trim clock accuracy
-#    wait_for_button_press: False                 # robot waits in standby mode until red button is pressed
-#    enable_self_shutdown: True                   # enables the robot to shut itself down (not good during demos)
-#    enable_player: False                         # enables sound player (disable if no hardware support)
-#    main_loop_freq_hz:  0.2                      # main ros loop frequency Hz (no effect on performance)
-#    arbitrator:
-#        loop_delay_sec: 0.01                     # arbitrator loop delay (sec)
-#        ballistic_loop_delay_sec: 0.2            # loop delay for ballistic tasks (sec)
-#    battery:
-#        enable_battery_messaging:    True        # if True we enable low battery messages to be sent
-#        enable_channel_a_messaging:  False       # if True we enable low regulator on channel A messages to be sent
-#        enable_channel_b_messaging:  True        # if True we enable low regulator on channel B messages to be sent
-#        five_volt_a_channel:   2                 # AD channel for power supply A
-#        five_volt_b_channel:   1                 # AD channel for power supply B
-#        battery_channel:       0                 # AD channel for raw battery voltage
-#        raw_battery_threshold: 17.74             # raw and 5v regulator thresholds set from known measurements:
-#        low_5v_threshold:      4.75              # really 4.82v
-#        loop_delay_sec:       15                 # loop delay (sec)
-#    behaviours:
-#        accel_range_cm:    250.0                 # the distance used for acceleration and deceleration (cm)
-#        targeting_velocity: 10.0                 # low velocity from which we're prepared to immediately halt upon reaching a step target
-#    cruise_behaviour:
-#        active_range_cm:    90.0                 # the maximum distance in which this behaviour is active
-#        cruising_velocity:  50.0                 # velocity used for long distance steady cruising
-#    temperature:
-#        warning_threshold: 63.0                  # temperature threshold, exceeding this generates a warning (nominal 63°C)
-#        max_threshold:     80.0                  # max allowable temperature threshold, exceeding this sends an event (nominal 80°C, Pi max is 85°C))
-#        sample_time_sec:     10                  # modulo value against tock frequency (default 15s)
-#    fan:
-#        i2c_address:       0x38                  # the I²C address for the HT0740 device controlling the fan
-#        fan_threshold:      48.0                 # setpoint temperatury (nominal 50°C) at which fan turns on
-#        hysteresis:         2.0                  # thermostat hysteresis
-#    blob:
-#        image_width:       320                   # camera resolution: width
-#        image_height:      240                   # camera resolution: height
-#    image_processor:
-#        blob_color:        [248, 136, 255]       # color of blob to sense
-#        flip_horizontal:   False                 # flip the image horizontally
-#        flip_vertical:     False                 # flip the image verticaly
-#        start_row:         0                     # the top row of the image to be processed (0 is top)
-#        end_row:           -1                    # the bottom row of the image to be processed (-1 to use full image height)
-#        filter_threshold:  0.25                  # the low pass filter threshold for color distance (e.g., ignore > color distance of 0.25)
-#        take_snapshot:     False                 # also create timestamped JPEG of image
-#        print_image:       True                  # if True print image array to console
-#        print_summary:     True                  # if True print image summary to console
-#        suppress_info:     False                 # if True don't print 'complete' message
-#    video:
-#        enable_streaming: True                   # if True, stream video to a localhost HTTP server
-#        ctrl_lights: True                        # if True, permit video to control Matrix11x7 lights
-#        convert_mp4: True                        # if True, convert h264 source to mp4
-#        annotate: True                           # if True, include annotation on video
-#        title: 'NZPRG - KR01'                            # the title portion of the video annotation
-#        quality: -1                              # video quality: -1 for default; values between 1 (high) - 40 (low), typical between 20-25.
-#        remove_h264: False                       # if True, remove h264 video source after converting to mp4
-#        port: 8001                               # server port for streaming video
-#        width: 1600                              # video width
-#        height: 512                              # video height
-##       width: 1280                              # video width
-##       height: 720                              # video height
-#        framerate: 30                            # video framerate
-#        lux_threshold: 14                        # lux threshold for night mode
-#        dirname: 'videos'                        # the name of the output directory
-#        basename: 'vid'                          # the base name for output files
-#    nxp9dof:
-#        quaternion_accept: True                  # if true, we accept Quaternion alone once calibrated
-#        loop_delay_sec: 0.1                      # sensor loop delay (seconds)
-#    icm20948:
-#        heading_trim:   180.00                   # trim adjustment on heading
-#    bno085:
-#        loop_delay_sec: 0.1                      # sensor loop delay (seconds)
-#        pitch_trim:    0.00                      # trim adjustment on pitch
-#        roll_trim:     0.00                      # trim adjustment on roll
-#        heading_trim:  -90.00                      # trim adjustment on heading
-#    accelerometer:
-#        jitter_limit: 0.1                        # how much jitter is permitted whilst considered at rest
-#    lidar:
-#        min_angle: -40.0                         # minimum scan angle (clearance of bumper)
-#        max_angle:  40.0                         # maximum scan angle (clearance of bumper)
-#        play_sound: False                        # if True, play 'ping' sound during scanning
-#        degree_step: 5.0                         # resolution of scan
-#        step_delay_sec: 0.10                     # how long to linger at each degree step to permit a reading
-##       tof_range: 'medium'                      # ToF range: performance, long, medium or short
-#        tof_range: 'performance'                 # ToF range: performance, long, medium or short
-#        reverse_movement: True                   # reverses the servo movement in case hardware is backwards
-#        double_sweep: False                      # if True sweeps in both directions
-##       servo_number: 1                          # use this servo
-#        servo_number: -1                         # don't use a servo
-#    wall_follower:
-#        port_angle: -90.0                        # port-facing scan angle
-#        starboard_angle: 90.0                    # starboard-facing scan angle
-#        tof_range: 'performance'                 # ToF range: performance, long, medium or short
-#        servo_number: 2                          # use this servo
-#    ultrasonic_scanner:
-#        min_angle: -90.0                         # minimum scan angle
-#        max_angle:  90.0                         # maximum scan angle
-#        degree_step: 5.0                         # resolution of scan
-#        use_raw_distance: True                   # use raw distance, faster than when filtered
-#        read_delay_sec: 0.01                     # how long to wait at position for reading
-#        servo_number: 2                          # use this servo
-#    collision_detect:
-#        pin:            16                       # pin connected to 15cm infrared collection detection sensor
-#    motion_detect:
-#        pin:            19                       # pin connected to PIR sensor
-#    servo1:
-#        center_offset: 0.0                       # used by lidar: offset necessary to center the servo at 0.0
-#    servo2:
-#        center_offset: 2.0                       # used by uscanner and wall follower: offset necessary to center the servo at 0.0
-#    servo3:
-#        center_offset: 0.0                       # offset necessary to center the servo at 0.0
-#    servo4:
-#        center_offset: 0.0                       # offset necessary to center the servo at 0.0
-#    button:
-#        pin:           24                        # pin connected to hardware button
-#        toggle:      True                        # toggle or momentary button
-##   bumper:
-##       port_pin:      21                        # pin connected to port bumper
-##       cntr_pin:      19                        # pin connected to center bumper
-##       starboard_pin: 13                        # pin connected to starboard bumper
-##       upper_pin:      7                        # pin connected to upper bumper
-##   infrared:
-##       port_pin:           6                    # pin connected to port infrared
-##       cntr_pin:           0                    # pin connected to center infrared (use zero if using LR IR)
-##       stbd_pin:          16                    # pin connected to starboard infrared
-##       port_side_pin:      5                    # pin connected to port side infrared
-##       stbd_side_pin:     12                    # pin connected to starboard side infrared
-##       use_long_range:    True                  # use analog long range IR for center instead of short range digital IR
-#    gamepad_demo:
-#        enable_compass:        False             # if True, enable Compass
-#        enable_indicator:      False             # if True, enable RGB Indicator
-#        enable_ifs:            False             # if True, enable IntegratedFrontSensor
-#        controller:
-#            log_to_file:       False             # if True, log PID data to file
-#            log_to_console:    False             # if True, log PID data to console
-#            min_loop_time_ms:  5                 # gamepad loop time (ms)
-#    elastic:                                     # ElasticSearch connection
-##       host: '192.168.1.81'
-#        host: '192.168.1.74'
-#        port:              9200
-#        schema:            'robot'
-#        index:             'kr01'
-#        doc_type:          'pid'
-#    potentiometer:                               # potentiometer connected as voltage divider
-#        pin:             14                      # pin connected to wiper
-#        in_min:           0                      # minimum analog value from IO Expander
-#        in_max:         255                      # maximum analog value from IO Expander
-##       out_min:       -100.0                    # minimum scaled output value
-##       out_max:        100.0                    # maximum scaled output value
-##       out_max:          1.0                    # maximum scaled output value
-#        out_min:          0.5                    # minimum scaled output value
-#        out_max:          1.5                    # maximum scaled output value
-#    filewriter:
-#        extension: '.dat'                        # file extension (must include the dot)
-#        directory_name: 'data'                   # output directory name
-#        default_filename_prefix: 'motors'        # output directory name
-#        gnuplot_template_file: 'settings_slew_template.gp'  # template for gnuplot settings
-#        gnuplot_output_file: 'settings_slew.gp'  # output file for gnuplot settings
-#    moth:
-#        hysteresis:   10                         # permissable range for int values being considered equal
-#    i2c_master:
-#        device_id:  0x08                         # i2c hex address of slave device, must match Arduino's SLAVE_I2C_ADDRESS
-#        channel:       1                         # SMBus channel
-#        assignments:                             # pin assignments: a pin number followed by:
-##           0:  'AIN'                            # 'DIN' (digital input); 'DNP' (digital input, pullup); 'AIN' (analog input); or 'OUT' (output)
-#            1:  'AIN'
-#            2:  'AIN'
-#            3:  'AIN'
-#            4:  'AIN'
-#            5:  'AIN'
-##           7:  'OUT'
-#            9:  'DNP'
-#            10: 'DNP'
-#            11: 'DNP'
-##           12: 'DNP'
-#    rotary_ctrl:
-#        update_led:    True                      # update the RGB LED according to the value
-#    rotary_encoder:
-#        i2c_address:   0x0f                      # the I²C address for the device
-#        brightness:     1.0                      # the brightness of the RGB LED (0.0-1.0)
-#        increment:        1                      # the count change per rotary tick
-#    features:
-#        ht0740: False
-#        placeholder: ''
 
 #EOF

@@ -128,8 +128,8 @@ class Velocity(object):
         _test_velocity = self.steps_to_cm(self._steps_per_rotation)
         self._log.info('example conversion:\t{:7.4f}cm/rotation'.format(_test_velocity))
         assert _test_velocity == self._wheel_circumference
-        # ..............................
-        self._stepcount_timestamp = None
+        # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        self._stepcount_timestamp = time.time()
         self._steps_begin  = 0      # step count at beginning of velocity measurement
         self._velocity     = 0.0    # current velocity
         self._max_velocity = 0.0    # capture maximum velocity attained
@@ -157,7 +157,6 @@ class Velocity(object):
         This should be called regularly every 50ms (i.e., at 20Hz), calculating
         velocity based on the tick/step count of the motor encoder.
         '''
-#       self._log.info(Fore.BLUE + '{:+d} steps'.format(self._motor.steps))
         if self._enabled:
             if self._motor.enabled: # then calculate velocity from motor encoder's step count
                 _time_diff_ms = 0.0
@@ -169,6 +168,7 @@ class Velocity(object):
                     # we multiply our step count by the percentage error to obtain
                     # what would be the step count for our 50.0ms period
                     _diff_steps = _steps - self._steps_begin
+#                   self._log.info(Fore.BLUE + '{:+d} steps diff'.format(_diff_steps))
                     _time_error_percent = _time_error_ms / self._period_ms
                     _corrected_diff_steps = _diff_steps + ( _diff_steps * _time_error_percent )
                     # multiply the steps per period by the loop frequency (20) to get steps/second
@@ -176,11 +176,13 @@ class Velocity(object):
                     _cm_per_sec = self.steps_to_cm(_steps_per_sec)
                     self._velocity = _cm_per_sec
                     self._max_velocity = max(self._velocity, self._max_velocity)
-#                   self._log.info(Fore.BLUE + '{:+d} steps, {:+d}/{:5.2f} diff/corrected; time diff: {:>5.2f}ms; error: {:>5.2f}%;\t'.format(\
-#                           self._motor.steps, _diff_steps, _corrected_diff_steps, _time_diff_ms, _time_error_percent * 100.0) \
-#                           + Fore.YELLOW + 'velocity: {:>5.2f} steps/sec; {:<5.2f}cm/sec'.format(_steps_per_sec, self._velocity))
+#                   if _steps % 10 == 0:
+#                       self._log.info(Fore.BLUE + '{:+d} steps, {:+d}/{:5.2f} diff/corrected; time diff: {:>5.2f}ms; error: {:>5.2f}%;\t'.format(
+#                               self._motor.steps, _diff_steps, _corrected_diff_steps, _time_diff_ms, _time_error_percent * 100.0)
+#                               + Fore.YELLOW + 'motor power: {}; velocity: {:>5.2f} steps/sec; {:<5.2f}cm/sec'.format(self._motor.last_power, _steps_per_sec, self._velocity))
                 self._stepcount_timestamp = time.time()
                 self._steps_begin = _steps
+#               self._log.info(Fore.BLUE + '{:+d} steps, {:+d} begin'.format(self._motor.steps, self._steps_begin))
             else:
                 self._velocity = 0.0
                 self._log.warning('tick failed: motor disabled.')

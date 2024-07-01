@@ -67,7 +67,7 @@ try:
 
     _log.info('starting motor test...')
 
-    Player().play(Sound.BLIP)
+    Player.instance().play(Sound.BLIP)
 
     # go there...
     for power in map(lambda x: x/100.0, range(0, 50, 1)):
@@ -100,7 +100,7 @@ finally:
         _tb2.MotorsOff()
         _tb2.SetLeds(0.0, 0.0, 0.0) # black
 
-Player().play(Sound.BELL)
+Player.instance().play(Sound.BELL)
 
 _elapsed_ms = round(( dt.now() - _start_time ).total_seconds() * 1000.0)
 _log.info(Fore.YELLOW + 'complete: elapsed: {:d}ms'.format(_elapsed_ms))

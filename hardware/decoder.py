@@ -93,7 +93,7 @@ class Decoder(object):
         self._log = Logger('enc:{}'.format(orientation.label), level)
         self._gpio_a    = gpio_a
         self._gpio_b    = gpio_b
-        self._log.info('pin A: {:d}; pin B: {:d}'.format(self._gpio_a,self._gpio_b))
+        self._log.debug('pin A: {:d}; pin B: {:d}'.format(self._gpio_a,self._gpio_b))
         self._callback  = callback
         self._level_a   = 0
         self._level_b   = 0
@@ -106,22 +106,21 @@ class Decoder(object):
             elif _pi._notify is None:
                 raise Exception('can\'t connect to pigpio daemon; did you start it?')
             _pi._notify.name = 'pi.callback'
-            self._log.info('pigpio version {}'.format(_pi.get_pigpio_version()))
+            self._log.debug('pigpio version {}'.format(_pi.get_pigpio_version()))
             _pi.set_mode(self._gpio_a, pigpio.INPUT)
             _pi.set_mode(self._gpio_b, pigpio.INPUT)
             _pi.set_pull_up_down(self._gpio_a, pigpio.PUD_UP)
             _pi.set_pull_up_down(self._gpio_b, pigpio.PUD_UP)
-            self._log.info('configured {} motor encoder with channel A on pin {}, channel B on pin {}.'.format(orientation.name, self._gpio_a, self._gpio_b))
 #           _edge = pigpio.RISING_EDGE  # default
 #           _edge = pigpio.FALLING_EDGE
             _edge = pigpio.EITHER_EDGE
             self.callback_a = _pi.callback(self._gpio_a, _edge, self._pulse_a)
             self.callback_b = _pi.callback(self._gpio_b, _edge, self._pulse_b)
+            self._log.info('configured {} motor encoder with channel A on pin {}, channel B on pin {}.'.format(orientation.name, self._gpio_a, self._gpio_b))
         except Exception as e:
             self._log.error('error importing and/or configuring Motor: {}'.format(e))
             traceback.print_exc(file=sys.stdout)
             raise Exception('unable to configure decoder.')
-        self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_reversed(self):
@@ -134,12 +133,14 @@ class Decoder(object):
     def _pulse_a(self, gpio, level, tick):
         self._level_a = level
         if level == 1 and self._level_b == 1:
+#           self._log.info('pulse A; level: {}; level_b: {}'.format(level, self._level_b))
             self._callback(self._increment)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _pulse_b(self, gpio, level, tick):
         self._level_b = level;
         if level == 1 and self._level_a == 1:
+#           self._log.info('pulse B; level: {}; level_a: {}'.format(level, self._level_a))
             self._callback(-1 * self._increment)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

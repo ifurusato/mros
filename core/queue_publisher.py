@@ -67,8 +67,8 @@ class QueuePublisher(Publisher):
             self._log.warning('message {} ignored: queue publisher inactive.'.format(message.name))
         else:
             self._queue.put(message)
-#           self._log.debug('put message \'{}\' ({}) into queue ({:d} {})'.format(
-#                   message.event.label, message.name, self._queue.size, 'item' if self._queue.size == 1 else 'items'))
+            self._log.info('put message \'{}\' ({}) into queue ({:d} {})'.format(
+                    message.event.name, message.name, self._queue.size, 'item' if self._queue.size == 1 else 'items'))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):
@@ -84,20 +84,34 @@ class QueuePublisher(Publisher):
             self._log.warning('failed to enable publisher loop.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def clear(self):
+        self._queue.clear()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     async def _publisher_loop(self, f_is_enabled):
+
         self._log.info('starting queue publisher loop:\t' + Fore.YELLOW + ( '; (suppressed, type \'m\' to release)' if self.suppressed else '(released)') )
         while f_is_enabled():
             _count = next(self._counter)
             self._log.debug('[{:03d}] begin publisher loop...'.format(_count))
             if not self.suppressed:
-                while not self._queue.empty():
+                while not self._queue.empty:
                     _message = self._queue.poll()
                     await Publisher.publish(self, _message)
                     self._log.info('[{:03d}] published message '.format(_count)
                             + Fore.WHITE + '{} '.format(_message.name)
-                            + Fore.CYAN + 'for event \'{}\' with group \'{}\' and value: '.format(_message.event.label, _message.event.group.label)
+                            + Fore.CYAN + 'for event \'{}\' with group \'{}\' and value: '.format(_message.event.name, _message.event.group.name)
                             + Fore.YELLOW + '{}'.format(_message.payload.value))
-            await asyncio.sleep(self._publish_delay_sec)
+#           await asyncio.sleep(self._publish_delay_sec)
         self._log.info('publisher loop complete.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def disable(self):
+        '''
+        Disable this publisher.
+        '''
+        Publisher.disable(self) 
+        self.clear()
+        self._log.info('disabled publisher.')
 
 #EOF

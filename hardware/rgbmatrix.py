@@ -124,7 +124,7 @@ class RgbMatrix(object):
     def enable(self):
         '''
         Enables/starts a thread for the target process. This does not need to
-        be called if just using the matrix directly.   
+        be called if just using the matrix directly.
         '''
         global enabled
         if not self._closed and not self._closing:
@@ -457,7 +457,7 @@ class RgbMatrix(object):
         while enabled:
             time.sleep(0.2)
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def percent(self, value):
         '''
         Displays a vertical bar expressing a percentage between the pair of
@@ -465,7 +465,7 @@ class RgbMatrix(object):
         '''
         self.column(self._percent_to_column.convert(value))
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def column(self, col):
         '''
         Turn on a single column of the LEDs at maximum brightness. Because
@@ -478,13 +478,13 @@ class RgbMatrix(object):
 #       self._port_rgbmatrix.clear()
 #       self._stbd_rgbmatrix.clear()
         if col < 5: # cols 0-4
-#           self._log.info(Fore.GREEN + 'displaying column {:d} on starboard matrix...'.format(col))   
+#           self._log.info(Fore.GREEN + 'displaying column {:d} on starboard matrix...'.format(col))
             if self._port_rgbmatrix:
                 self.clear(Orientation.PORT, False)
             if self._stbd_rgbmatrix:
                 self._column(Orientation.STBD, col, blank=True)
         else: # cols 5-9
-#           self._log.info(Fore.RED   + 'displaying column {:d} on port matrix...'.format(col))   
+#           self._log.info(Fore.RED   + 'displaying column {:d} on port matrix...'.format(col))
             if self._stbd_rgbmatrix:
                 self.clear(Orientation.STBD, False)
             if self._port_rgbmatrix:
@@ -494,7 +494,7 @@ class RgbMatrix(object):
         if self._port_rgbmatrix:
             self._port_rgbmatrix.show()
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _column(self, orientation, col, blank=True):
         '''
         Turn on a single column of the LEDs at maximum brightness.
@@ -656,7 +656,7 @@ class RgbMatrix(object):
         if self._stbd_rgbmatrix:
             self._set_color(self._stbd_rgbmatrix, color, show)
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
     def set_column(rgbmatrix5x5, column, color, brightness, blank=True):
         '''

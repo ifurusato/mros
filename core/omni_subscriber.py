@@ -56,7 +56,7 @@ class OmniSubscriber(Subscriber):
         message.acknowledge_sent()
         _value = message.payload.value
         self._log.info('🐹 arbitrated message ' + Fore.WHITE + '{} '.format(message.name)
-                + Fore.CYAN + 'for event \'{}\' with value type: '.format(message.event.label)
+                + Fore.CYAN + 'for event \'{}\' with value type: '.format(message.event.name)
                 + Fore.YELLOW + '{}'.format(type(_value)))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -69,7 +69,7 @@ class OmniSubscriber(Subscriber):
         if message.gcd:
             raise GarbageCollectedError('cannot process message: message has been garbage collected.')
         _event = message.event
-        self._log.info('🐹 pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.label))
+        self._log.info('🐹 pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         await Subscriber.process_message(self, message)
         self._log.info('🐹 post-processing message {}'.format(message.name))
 

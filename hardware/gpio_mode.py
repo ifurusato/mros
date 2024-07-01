@@ -21,7 +21,7 @@ except Exception:
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class GpioMode(Enum):
-    __order__ = " OUT IN SERIAL SPI   I2C  HARD_PWM UNKNOWN "
+    __order__ = " OUT IN SERIAL SPI I2C HARD_PWM UNKNOWN "
     '''
     Enumerates the set of GPIO modes.
     '''

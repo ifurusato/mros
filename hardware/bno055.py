@@ -149,7 +149,7 @@ class BNO055:
         if self.is_calibrated:
             self._log.info(Fore.GREEN + 'bno055 is calibrated.' + Style.RESET_ALL)
             if self._play_sound:
-                Player().play(Sound.CHATTER_3)
+                Player.instance().play(Sound.CHATTER_3)
             self._show_compass_calibration(self._rgbmatrix, 0.0, 0.0, 0.0, 0.0)
         else:
             self._log.error(Fore.RED + 'bno055 could not be calibrated.' + Style.RESET_ALL)
@@ -305,7 +305,7 @@ class BNO055:
         else:
             self._log.info(Fore.BLUE + Style.DIM + 'heading:\tNA\t(euler)')
 
-        # BNO055 Absolute Orientation (Quaterion, 100Hz) Four point quaternion output for more accurate data manipulation ..............
+        # BNO055 Absolute Orientation (Quaterion, 100Hz) Four point quaternion output for more accurate data manipulation
         _quat = self._bno055.quaternion
         if _quat != None:
             _quat_w = _quat[0] if _quat[0] != None else None
@@ -327,7 +327,7 @@ class BNO055:
 #                   print(Fore.YELLOW+Style.BRIGHT+'HEADING+360'+Style.RESET_ALL)
                     _orig_quat_heading += 360.0
 
-                # heading ............................................................
+                # heading ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 #               self._log.debug(Fore.BLUE + Style.NORMAL + '_quat_w={:>5.4f}, _quat_x={:>5.4f}, _quat_y={:>5.4f}, _quat_z={:>5.4f}'.format(_quat_w, _quat_x, _quat_y, _quat_z) )
 
                 if self.is_calibrated:
@@ -350,7 +350,8 @@ class BNO055:
 
 #              _cardinal = self.get_cardinal() + Fore.WHITE + _style + '\t {}\n'.format(_cardinal.display.lower()))
 
-#   #           # pitch ..............................................................
+#   #           # pitch ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
 #   #           if Convert.in_range(_e_pitch, _q_pitch, self._error_range):
 #   #               self._pitch = _e_pitch + self._pitch_trim
 #   #               self._log.debug('    ' + Fore.CYAN     + Style.BRIGHT + 'pitch:  \t{:>5.4f}° (calibrated)'.format(_e_pitch))
@@ -358,7 +359,7 @@ class BNO055:
 #   #               self._log.debug('    ' + Fore.YELLOW   + Style.BRIGHT + 'pitch:  \t{:>5.4f}° (euler)'.format(_e_pitch))
 #   #               self._log.debug('    ' + Fore.GREEN    + Style.BRIGHT + 'pitch:  \t{:>5.4f}° (quaternion)'.format(_q_pitch))
 #   #               self._pitch = None
-#   #           # roll ...............................................................
+#   #           # roll ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 #   #           if Convert.in_range(_e_roll, _q_roll, self._error_range):
 #   #               self._roll = _e_roll + self._roll_trim
 #   #               self._log.debug('    ' + Fore.CYAN     + Style.BRIGHT + 'roll:   \t{:>5.4f}° (calibrated)'.format(_e_roll))

@@ -18,14 +18,14 @@ from core.util import Util
 class Speed(Enum):
     '''
     Provides an enumeration of both ahead (forward) and astern (reverse)
-    Chadburn-style speeds, as corresponding to an abstract velocity.
+    Chadburn-style speeds, as corresponding to an abstract speed value.
 
     The default values for astern and ahead proportional power are initially
     set to zero; these must be set from the YAML application configuration
     via the configure() method.
     '''
     #                                                  proportional power
-    #                    label             velocity      astern  ahead
+    #                    name                   speed      astern  ahead
     STOP          = ( 1, 'stop',                  0.0,      0.0,   0.0 )
     DEAD_SLOW     = ( 2, 'dead slow',            20.0,      0.0,   0.0 )
     SLOW          = ( 3, 'slow',                 30.0,      0.0,   0.0 )
@@ -37,8 +37,8 @@ class Speed(Enum):
     MAXIMUM       = ( 9, 'maximum speed',       100.0,      0.0,   0.0 )
 
     # ignore the first param since it's already set by __new__
-    def __init__(self, num, label, velocity, astern, ahead):
-        self._label    = label
+    def __init__(self, num, name, velocity, astern, ahead):
+        self._name     = name
         self._velocity = velocity
         self._astern   = astern
         self._ahead    = ahead
@@ -50,8 +50,8 @@ class Speed(Enum):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
-    def label(self):
-        return self._label
+    def name(self):
+        return self._name
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -184,7 +184,7 @@ class Speed(Enum):
     def print_configuration(log):
         log.info('configured speeds:')
         for _speed in Speed:
-            log.info('  {}:{}astern: '.format(_speed.label, Util.repeat(' ', 21 - len(_speed.label))) + '{:>5.2f}'.format(_speed.astern) 
+            log.info('  {}:{}astern: '.format(_speed.name, Util.repeat(' ', 21 - len(_speed.name))) + '{:>5.2f}'.format(_speed.astern) 
                     + '   ahead: {:>5.2f}'.format(_speed.ahead))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

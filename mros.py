@@ -16,7 +16,7 @@
 #234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
 #
 
-import os, sys, signal, time, threading, traceback
+import os, sys, signal, time, traceback
 import argparse, psutil
 from pathlib import Path
 from colorama import init, Fore, Style
@@ -34,6 +34,7 @@ from core.message import Message, Payload
 from core.message_bus import MessageBus
 from core.message_factory import MessageFactory
 from core.config_loader import ConfigLoader
+from core.config_error import ConfigurationError
 from core.controller import Controller
 
 from core.publisher import Publisher
@@ -49,16 +50,15 @@ from core.macro_subscriber import MacroSubscriber
 from hardware.system import System
 from hardware.screen import Screen
 from hardware.sensor_array import SensorArray
+from hardware.rtof import RangingToF
 from hardware.remote_ctrl_publisher import RemoteControlPublisher
 from hardware.clock_publisher import ClockPublisher
-
 from hardware.remote_ctrl_subscriber import RemoteControlSubscriber
 
 from hardware.i2c_scanner import I2CScanner
 #from hardware.battery import BatteryCheck
 #from hardware.killswitch import KillSwitch
 from hardware.irq_clock import IrqClock
-from hardware.motor_configurer import MotorConfigurer
 from hardware.motion_controller import MotionController
 #from hardware.status import Status
 from hardware.indicator import Indicator
@@ -117,8 +117,9 @@ class MROS(Component, FiniteStateMachine):
         self._macro_publisher        = None
         self._clock_publisher        = None
         self._sensor_array_publisher = None
+        self._rtof_publisher         = None
         self._remote_ctrl_publisher  = None
-#       self._experiment_mgr         = None
+        self._experiment_mgr         = None
         self._controller             = None
         self._gamepad_publisher      = None
         self._motion_controller      = None
@@ -205,14 +206,15 @@ class MROS(Component, FiniteStateMachine):
 
         self._use_external_clock = self._config['mros'].get('use_external_clock')
         if self._use_external_clock and _pigpio_available:
-            self._log.info('configuring external clock callback…')
+            self._log.info('creating external clock…')
             self._irq_clock = IrqClock(self._config, level=self._level)
         else:
             self._irq_clock = None
 
         # JSON configuration dump ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         if _args['json_dump_enabled']:
-            print('DUMP JSON xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+            print('exporting JSON configuration.')
+            # TODO
 
         # create components ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
@@ -222,12 +224,15 @@ class MROS(Component, FiniteStateMachine):
 
         _pubs = arguments.pubs if arguments.pubs else ''
 
-        _enable_sensor_array_publisher = _cfg.get('enable_sensor_array_publisher') or 'i' in _pubs
-        if _enable_sensor_array_publisher:
-            self._sensor_array_publisher = SensorArray(self._config, self._message_bus, self._message_factory, level=self._level)
-
         if _cfg.get('enable_queue_publisher') or 'q' in _pubs:
             self._queue_publisher = QueuePublisher(self._config, self._message_bus, self._message_factory, self._level)
+
+        _enable_sensor_array_publisher = _cfg.get('enable_sensor_array_publisher')
+        if _enable_sensor_array_publisher:
+#           self._sensor_array_publisher = SensorArray(self._config, self._queue_publisher, self._message_bus, self._message_factory, level=self._level)
+#           self._irq_clock.add_callback(self._sensor_array_publisher.external_callback_method)
+            self._sensor_array_publisher = SensorArray(self._config, self._message_bus, self._message_factory, level=self._level)
+
 #       if _cfg.get('enable_macro_publisher') or 'm' in _pubs:
 #           _callback = None
 #           self._macro_publisher = MacroPublisher(self._config, self._message_bus, self._message_factory, self._queue_publisher, _callback, self._level)
@@ -241,6 +246,10 @@ class MROS(Component, FiniteStateMachine):
         _enable_clock_publisher = _cfg.get('enable_clock_publisher')
         if _enable_clock_publisher and self._irq_clock:
             self._clock_publisher = ClockPublisher(self._config, self._message_bus, self._message_factory, self._irq_clock, level=self._level)
+
+        _enable_rtof_publisher = _cfg.get('enable_rtof_publisher')
+        if _enable_rtof_publisher:
+            self._rtof_publisher = RangingToF(self._config, self._message_bus, self._message_factory, skip_init=True, level=self._level)
 
 #       _enable_event_publisher = _cfg.get('enable_event_publisher') or 'e' in _pubs
 #       if _enable_event_publisher:
@@ -280,11 +289,11 @@ class MROS(Component, FiniteStateMachine):
 
         # add motion controller (subscriber) ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._log.info('configure motor controller…')
-        self._motion_controller = MotionController(self._config, self._message_bus, level=self._level)
+        self._motion_controller = MotionController(self._config, self._message_bus, self._irq_clock, level=self._level)
         self._motor_controller = self._motion_controller.motor_controller
 
-        if self._use_external_clock and self._irq_clock:
-            self._irq_clock.add_callback(self._motor_controller._external_callback_method)
+#       if self._use_external_clock and self._irq_clock:
+#           self._irq_clock.add_callback(self._motor_controller.external_callback_method)
 
         # and finally, the garbage collector:
         self._garbage_collector = GarbageCollector(self._config, self._message_bus, level=self._level)
@@ -555,16 +564,17 @@ class MROS(Component, FiniteStateMachine):
             self._log.warning('already closing.')
         elif self.enabled:
             self._log.info('disabling…')
-            if self._experiment_mgr:
-                self._experiment_mgr.disable()
-            while not Component.disable(self):
-                self._log.info('disabling component…')
-            if self._motor_controller:
-                self._motor_controller.disable()
-            if self._external_clock and not self._external_clock.disabled:
-                self._external_clock.disable()
+            if self._queue_publisher:
+                self._queue_publisher.disable()
             if self._irq_clock and not self._irq_clock.disabled:
                 self._irq_clock.disable()
+            if self._external_clock and not self._external_clock.disabled:
+                self._external_clock.disable()
+            if self._experiment_mgr:
+                self._experiment_mgr.disable()
+            if self._motor_controller:
+                self._motor_controller.disable()
+            Component.disable(self)
             FiniteStateMachine.disable(self)
             self._log.info('disabled.')
         else:
@@ -589,40 +599,41 @@ class MROS(Component, FiniteStateMachine):
         else:
             try:
                 self._log.info('closing…')
+                Component.close(self) # will call disable()
                 self._closing = True
                 _component_registry = globals.get('component-registry')
                 _registry = _component_registry.get_registry()
+                if self._irq_clock and not self._irq_clock.closed:
+                    self._irq_clock.close()
                 # closes all components that are not a publisher, subscriber, the message bus or mros itself…
                 while len(_registry) > 0:
                     _name, _component = _registry.popitem(last=True)
                     if not isinstance(_component, Publisher) and not isinstance(_component, Subscriber) \
                             and _component != self and _component != self._message_bus:
-                        self._log.debug('closing component \'{}\' ({})…'.format(_name, _component.classname))
+                        self._log.info(Style.DIM + 'closing component \'{}\' ({})…'.format(_name, _component.classname))
                         _component.close()
                 time.sleep(0.1)
                 if self._message_bus and not self._message_bus.closed:
                     self._log.info('closing message bus from mros…')
                     self._message_bus.close()
-                    self._log.info('closed message bus.')
+                    self._log.info('message bus closed.')
                 while not Component.close(self): # will call disable()
+                    print('closing on 2nd try................')
                     self._log.info('closing component…')
-                if self._motion_controller:
-                    self._motion_controller.close()
-                if self._status_light:
-                    self._status_light.close()
+#               if self._motion_controller:
+#                   self._motion_controller.close()
 #               if self._screen:
 #                   self._screen.on()
-                if self._disable_leds: # restore normal function of Pi LEDs
-                    self._set_pi_leds(True)
                 FiniteStateMachine.close(self)
-                if self._status_light:
-                    self._status_light.close()
                 self._closing = False
                 self._log.info('application closed.')
-                self._log.close()
-#               sys.exit(0)
             except Exception as e:
-                self._log.error('error closing application: {}\n{}'.format(e, traceback.format_exc()))
+                print('error closing application: {}\n{}'.format(e, traceback.format_exc()))
+            finally:
+                if self._disable_leds: # restore normal function of Pi LEDs
+                    self._set_pi_leds(True)
+                self._log.close()
+                sys.exit(0)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def export_config(self):
@@ -732,9 +743,12 @@ def parse_args():
         _log.error('exit on error.')
         sys.exit(1)
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+_mros = None
+
 # execution handler ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def signal_handler(signal, frame):
-    global _mros
     print('\nsignal handler    :' + Fore.MAGENTA + Style.BRIGHT + ' INFO  : Ctrl-C caught: exiting…' + Style.RESET_ALL)
     if _mros and not ( _mros.closing or _mros.closed ):
         _mros.close()
@@ -742,12 +756,8 @@ def signal_handler(signal, frame):
 #   sys.stderr = DevNull()
     sys.exit(0)
 
-# main ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-_mros = None
-
+# main ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def main(argv):
-    global _mros
     signal.signal(signal.SIGINT, signal_handler)
     _suppress = False
     _log = Logger("main", Level.INFO)
@@ -776,10 +786,7 @@ def main(argv):
     except Exception:
         print(Fore.RED + Style.BRIGHT + 'error starting mros: {}'.format(traceback.format_exc()) + Style.RESET_ALL)
     finally:
-        if not _suppress:
-            _log.info('mros exit.')
-        if _mros and not ( _mros.closing or _mros.closed ):
-            _log.info('finally calling close…')
+        if _mros and not _mros.closed:
             _mros.close()
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

@@ -87,6 +87,8 @@ class IrqClock(Component):
         Adds a callback to those triggered by clock ticks.
         '''
         if callback:
+            if callback in self.__callbacks:
+                raise Exception('callback already exists.')
             self.__callbacks.append(callback)
         else:
             raise TypeError('null callback argument')

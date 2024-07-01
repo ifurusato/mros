@@ -12,9 +12,13 @@
 # MissingComponentError at bottom
 #
 
+import threading
 from collections import OrderedDict
 from core.logger import Logger
 from core.util import Util
+from core.config_error import ConfigurationError
+from colorama import init, Fore, Style
+init()
 
 import core.globals as globals
 globals.init()
@@ -170,16 +174,18 @@ class ComponentRegistry(object):
     Maintains a registry of all Components, in the order in which they were created.
     '''
     def __init__(self, level):
-        self._log = Logger("comp-reg", level)
+        self._log = Logger("comp-registry", level)
         self._dict = OrderedDict()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def add(self, name, component):
         '''
-        Add a component to the registry using a unique name.
+        Add a component to the registry using a unique name, raising a
+        ConfigurationError if a like-named component already exists in
+        the registry.
         '''
         if name in self._dict:
-            self._log.warning('component \'{}\' already in registry.'.format(name))
+            raise ConfigurationError('component \'{}\' already in registry.'.format(name))
         else:
             self._dict[name] = component
             self._log.info('added component \'{}\' to registry ({:d} total).'.format(name, len(self._dict)))
@@ -189,9 +195,11 @@ class ComponentRegistry(object):
         '''
         Print the registry to the log.
         '''
-        self._log.info('component list:')
-        for _name, _component in self._dict.items():
-            self._log.info('  {} {}{}'.format(_name, Util.repeat(' ', 16 - len(_name)), _component.classname))
+        _mutex = threading.Lock()
+        with _mutex:
+            self._log.info('component list:')
+            for _name, _component in self._dict.items():
+                self._log.info('  {} {}'.format(_name, Util.repeat(' ', 16 - len(_name))) + Style.DIM + '{}'.format(_component.classname))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_registry(self):

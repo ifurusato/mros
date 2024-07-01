@@ -11,7 +11,9 @@
 #
 
 import sys
+from datetime import datetime as dt
 import itertools # TEMP
+from math import isclose
 from collections import deque as Deque
 from colorama import init, Fore, Style
 init()
@@ -26,9 +28,9 @@ from hardware.pid import PID
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class PIDController(Component):
     '''
-    Provides a configurable PID motor controller. This also maintains a value
-    for the current motor velocity by sampling the step count from the motors
-    on the same interval as the PID calls.
+    Provides a configurable PID-based motor controller. This also maintains
+    a value for the current motor target speed by sampling the step count
+    from the motors on the same interval as the PID calls.
 
     :param config:       The application configuration, read from a YAML file.
     :param motor:        The motor to be controlled.
@@ -50,7 +52,8 @@ class PIDController(Component):
         self._log = Logger('pid-ctrl:{}'.format(self._orientation.label), level)
         Component.__init__(self, self._log, suppressed=suppressed, enabled=enabled)
         self._counter = itertools.count() # TEMP
-        # PID configuration ................................
+        # PID configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        self._speed_scale_factor = config['mros'].get('motor_controller').get('scale_factor')
         _cfg = config['mros'].get('motor').get('pid_controller')
         _kp         = _cfg.get('kp') # proportional gain
         _ki         = _cfg.get('ki') # integral gain
@@ -66,6 +69,8 @@ class PIDController(Component):
         self._deque = Deque([], maxlen=_queue_len)
         self._power        = 0.0
         self._last_power   = 0.0
+        self._last_time = dt.now() # for calculating elapsed time
+        self._verbose      = False
         self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -128,34 +133,51 @@ class PIDController(Component):
     def stats(self):
         '''
          Returns statistics a tuple for this PID contrroller:
-            [kp, ki, kd, cp, ci, cd, last_power, current_motor_power, power, _velocity, setpoint, steps]
+            [kp, ki, kd, cp, ci, cd, last_power, current_motor_power, power, _speed, setpoint, steps]
         '''
         kp, ki, kd = self._pid.constants
         cp, ci, cd = self._pid.components
-        return kp, ki, kd, cp, ci, cd, self._last_power, self._motor.current_power_level, self._power, self._motor.velocity, self._pid.setpoint, self._motor.steps
+        return kp, ki, kd, cp, ci, cd, self._last_power, self._motor.current_power_level, self._power, self._motor.target_speed, self._pid.setpoint, self._motor.steps
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_velocity(self, target_velocity):
+    @property
+    def target_speed(self):
+        '''
+        Returns the current target speed, scaled as 0.0-1.0.
+        '''
+        return self._motor.target_speed / self._speed_scale_factor
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_speed(self, target_speed):
         if self.enabled:
-            self._pid.setpoint = target_velocity
-            _velocity = self._motor.velocity
+            if isclose(target_speed, 0.0, abs_tol=1e-2):
+                self._pid.setpoint = 0.0
+                self._power = 0.0
+                self._motor.set_motor_power(0.0)
+#               self._log.info(Fore.WHITE + Style.DIM + 'target speed: {:5.2f} sets power motor: 0.0'.format(target_speed))
+            else:
+                self._pid.setpoint = target_speed
+                # converts speed to power...
+                _pid_output = self._pid(self._motor.velocity)
+                self._power += _pid_output
+                _motor_power = self._power
+                self._last_power = self._power
+#               _mean_setpoint = self._get_mean_setpoint(self._pid.setpoint)
+#               if _mean_setpoint == 0.0:
+#                   self._log.info(Fore.WHITE + Style.BRIGHT + 'set power for {} motor: {:<5.2f} to 0.0 (pid output: {:5.2f})'.format(self._orientation.label, _motor_power, _pid_output))
+#                   self._motor.set_motor_power(0.0)
 
-            # converts velocity to power...
-            _pid_output = self._pid(_velocity)
-            self._power += _pid_output
-            _motor_power = self._power / 100.0
-            self._last_power = self._power
-
-#           _mean_setpoint = self._get_mean_setpoint(self._pid.setpoint)
-#           if _mean_setpoint == 0.0:
-#               self._log.info(Fore.WHITE + Style.BRIGHT + 'set power for {} motor: {:<5.2f} to 0.0 (pid output: {:5.2f})'.format(self._orientation.label, _motor_power, _pid_output))
-#               self._motor.set_motor_power(0.0)
-#           else:
-            _count = next(self._counter)
-            if self._motor.orientation is Orientation.SFWD and _count % 10 == 0:
-                self._log.info(Fore.YELLOW + 'set {} motor; velocity: {:5.2f}; targetv : {:5.2f}; PID setpoint: {:5.2f};'.format(self._orientation.label, _velocity, target_velocity, self._pid.setpoint) 
-                        + Style.BRIGHT + ' motor power: {:<5.2f}'.format(_motor_power) + Style.NORMAL + ' (self._power: {:5.2f}; pid output: {:5.2f})'.format(self._power, _pid_output))
-            self._motor.set_motor_power(_motor_power)
+                if self._verbose:
+                    _elapsed_ms = round(( dt.now() - self._last_time ).total_seconds() * 1000.0)
+                    _count = next(self._counter)
+                    if _count % 20 == 0:
+                        self._log.info(Fore.YELLOW + 'target speed: {:5.2f}; current speed: {:5.2f};'.format(target_speed / self._speed_scale_factor, self._motor.speed)
+#                               + Fore.GREEN + Style.NORMAL + ' pid.setpoint: {:5.2f}; pid output: {:5.2f};'.format(self._pid.setpoint, _pid_output)
+#                               + Fore.MAGENTA + ' kp: {:7.4f}; ki: {:7.4f}; kd: {:7.4f})'.format(self._pid.kp, self._pid.ki, self._pid.kd)
+                                + Fore.WHITE + ' motor power: {:<5.2f};'.format(_motor_power)
+                                + Fore.CYAN + Style.NORMAL + ' elapsed: {:d}ms'.format(_elapsed_ms))
+                self._motor.set_motor_power(_motor_power)
+        self._last_time = dt.now()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _get_mean_setpoint(self, value):

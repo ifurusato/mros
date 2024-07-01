@@ -60,21 +60,22 @@ class GamepadPublisher(Publisher):
                 self._gamepad = None
 
         if self._gamepad:
-            self._log.info(Fore.YELLOW + 'enabling gamepad...')
+            self._log.info('enabling gamepad...')
             try:
-                # attempt connection .................................
+                # attempt connection ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 self._gamepad.enable()
                 _count = 0
                 while not self._gamepad.has_connection():
                     _count += 1
                     if _count == 1:
-                        self._log.info(Fore.YELLOW + 'connecting to gamepad...')
+                        self._log.info('connecting to gamepad...')
                     else:
-                        self._log.info(Fore.YELLOW + 'gamepad not connected; re-trying... [{:d}]'.format(_count))
+                        self._log.warning('gamepad not connected; re-trying... [{:d}]'.format(_count))
                     self._gamepad.connect()
                     time.sleep(0.5)
                     if self._gamepad.has_connection() or _count > 5:
                         break
+
             except ConnectionError as e:
                 self._log.warning('unable to connect to gamepad: {}'.format(e))
                 self._gamepad = None
@@ -110,18 +111,22 @@ class GamepadPublisher(Publisher):
             self._connect_gamepad()
             if self._gamepad:
                 self._gamepad.enable()
-                self._message_bus.loop.create_task(self._gamepad._gamepad_loop(self._gamepad_publish_loop,
-                        lambda: self.enabled), name=GamepadPublisher._PUBLISH_LOOP_NAME)
-                self._log.info('enabled')
+                if self.enabled:
+                    self._log.debug('creating gamepad loop.')
+                    self._message_bus.loop.create_task(self._gamepad._gamepad_loop(self.__gamepad_publish_loop,
+                            lambda: self.enabled), name=GamepadPublisher._PUBLISH_LOOP_NAME)
+                    self._log.info('enabled')
+                else:
+                    raise Exception('gamepad not enabled: lost connection?')
             else:
                 Publisher.disable(self)
-                self._log.info('no gamepad.')
+                self._log.info('disabled: no gamepad.')
         else:
+            Publisher.disable(self)
             raise Exception('unable to enable.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    async def _gamepad_publish_loop(self, message):
-#       self._log.debug('🎮 gamepad callback for message:\t' + Fore.YELLOW + '{}'.format(message.event.label))
+    async def __gamepad_publish_loop(self, message):
         await Publisher.publish(self, message)
         await asyncio.sleep(self._publish_delay_sec)
 
@@ -133,13 +138,13 @@ class GamepadPublisher(Publisher):
         if self._gamepad:
             self._gamepad.disable()
         Publisher.disable(self)
-        self._log.info(Fore.YELLOW + 'disabled publisher.')
+        self._log.info('disabled gamepad publisher.')
 
     # message handling ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _print_event(self, color, event, value):
-        self._log.info('event:\t' + color + Style.BRIGHT + '{}; value: {}'.format(event.label, value))
+        self._log.info('event:\t' + color + Style.BRIGHT + '{}; value: {}'.format(event.name, value))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def print_keymap(self):

@@ -12,7 +12,8 @@
 # MR01 Robot Operating System Daemon (mrosd). This also uses the mrosd.service.
 #
 # see: https://dpbl.wordpress.com/2017/02/12/a-tutorial-on-python-daemon/
-# ..............................................................................
+#
+# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
 import os, signal, sys, time, threading, traceback, itertools
 
@@ -33,12 +34,12 @@ from hardware.toggle import Toggle
 
 PIDFILE = '/home/pi/mros/.mrosd.pid'
 
-# ..............................................................................
+# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
 def shutdown(signum, frame):  # signum and frame are mandatory
     sys.exit(0)
 
-# ..............................................................................
+# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 class MrosDaemon():
     '''
     Monitors a toggle switch connected to a GPIO pin.
@@ -51,7 +52,7 @@ class MrosDaemon():
         self._log = Logger("mrosd", self._level)
         self._log.info('initialising mrosd...')
 
-        # read YAML configuration ..............................................
+        # read YAML configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _loader = ConfigLoader(self._level)
         _filename = 'config.yaml'
         self._config = _loader.configure(_filename)
@@ -76,11 +77,11 @@ class MrosDaemon():
         self._log.info('pid file: {}'.format(PIDFILE))
         self._log.info('mrosd ready.')
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _get_timestamp(self):
         return datetime.utcfromtimestamp(datetime.utcnow().timestamp()).isoformat()
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def read_state(self):
         '''
         Reads the state of the toggle switch then returns the value. This only
@@ -98,15 +99,15 @@ class MrosDaemon():
                 self.disable()
             self._old_state = self._state
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):
         self._enable_mros()
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable(self):
         self._disable_mros()
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _enable_mros(self):
         self._log.info('mros state enabled at: {}'.format(self._get_timestamp()))
         if self._mros is None:
@@ -122,7 +123,7 @@ class MrosDaemon():
 #           _arbitrator.set_suppressed(False)
             self._log.info('mros arbitrator enabled.')
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _disable_mros(self):
         self._log.info('mros state disabled at: {}'.format(self._get_timestamp()))
         if self._mros is not None:
@@ -131,7 +132,7 @@ class MrosDaemon():
 #           _arbitrator.set_suppressed(True)
             self._log.info('mros arbitrator suppressed.')
 
-    # ..........................................................................
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def close(self):
         self._log.info('closing mrosd...')
         if self._mros is not None:
@@ -143,7 +144,7 @@ class MrosDaemon():
         self._log.info('mrosd closed.')
 
 
-# main .........................................................................
+# main ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
 def main():
 
@@ -165,7 +166,7 @@ def main():
                 print('error closing mros daemon.')
         print('mrosd complete.')
 
-# ..............................................................................
+# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
 with daemon.DaemonContext(
     stdout=sys.stdout,
@@ -174,14 +175,7 @@ with daemon.DaemonContext(
     working_directory='/home/pi/mros',
     umask=0o002,
     pidfile=pidfile.TimeoutPIDLockFile(PIDFILE), ) as context:
-#   signal_map={
-#       signal.SIGTERM: shutdown,
-#       signal.SIGTSTP: shutdown
-#   }) as context:
+#   signal_map={ signal.SIGTERM: shutdown, signal.SIGTSTP: shutdown }) as context:
     main()
-
-# call main ....................................................................
-#if __name__== "__main__":
-#    main()
 
 #EOF

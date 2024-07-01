@@ -10,6 +10,8 @@
 # modified: 2024-06-11
 #
 
+import traceback
+
 from colorama import init, Fore, Style
 init()
 
@@ -58,6 +60,12 @@ class GPS(object):
         '''
         self._log  = Logger('gps', level)
         self._gps  = PA1010D()
+        try:
+            self._gps.update()
+            self._enabled = True
+        except OSError as ose:
+            self._log.error('disabled: error encountered: {}'.format(ose))
+            self._enabled = False
         self._data      = None
         self._timestamp = None
         self._latitude  = None
@@ -75,9 +83,19 @@ class GPS(object):
         self._verbose   = False
         self._log.info('ready.')
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_verbose(self, verbose):
         self._verbose = verbose
 
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def enabled(self):
+        '''
+        Returns True if the GPS sensor is available and enabled.
+        '''
+        return self._enabled
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
     def timestamp(self):
         return self._timestamp
@@ -91,11 +109,11 @@ class GPS(object):
         return self._longitude
 
     @property
-    def lat_dir(self):
+    def latitude_direction(self):
         return self._lat_dir
 
     @property
-    def lon_dir(self):
+    def longitude_direction(self):
         return self._lon_dir
 
     @property
@@ -115,7 +133,7 @@ class GPS(object):
         return self._gps_qual
 
     @property
-    def speed(self):
+    def speed_over_ground(self):
         return self._speed
 
     @property
@@ -137,46 +155,52 @@ class GPS(object):
         Polls the GPS sensor, populating the various values.
         If the poll fails this will zero or nullify all values.
         '''
+        if not self._enabled:
+            return False
         _style = Style.DIM
         result = self._gps.update()
         _data = self._gps.data
         if result and (_data is not None):
             self._timestamp = _data.get('timestamp')
-            self._latitude  = float(_data.get('latitude'))
-            self._longitude = float(_data.get('longitude'))
-            self._lat_dir   = _data.get('lat_dir')
-            self._lon_dir   = _data.get('lon_dir')
-
-            _altitude  = _data.get('altitude')
-            self._altitude  = 0.0 if _altitude is None else float(_altitude)
-            self._geo_sep   = _data.get('geo_sep')
-
             _num_sats = _data.get('num_sats')
             self._num_sats  = 0 if _num_sats is None else int(_num_sats)
-            self._gps_qual  = float(_data.get('gps_qual'))
-            self._speed     = _data.get('speed_over_ground')
-            self._pdop      = _data.get('pdop')
-            self._hdop      = _data.get('hdop')
-            self._vdop      = _data.get('vdop')
-            if self._num_sats is not None and self._num_sats > 1:
-                _style = Style.NORMAL
-            if self._verbose:
-                self._log.info(_style + '''
-                                  Timestamp:  {timestamp}
-                                  Latitude:   {latitude}
-                                  Longitude:  {longitude}
-                                  Lat Dir:    {lat_dir}
-                                  Long Dir:   {lon_dir}
-                                  Altitude:   {altitude}
-                                  Geo Sep:    {geo_sep}
-                                  Sats:       {num_sats}
-                                  Quality:    {gps_qual}
-                                  Speed:      {speed_over_ground}
-                                  Fix Type:   {mode_fix_type}
-                                  PDOP:       {pdop}
-                                  VDOP:       {vdop}
-                                  HDOP:       {hdop}'''.format(**_data))
-            return True
+            if self._num_sats > 0:
+                _latitude  = _data.get('latitude')
+                self._latitude  = -1 if _latitude is None else float(_latitude)
+                _longitude = _data.get('longitude')
+                self._longitude = -1 if _longitude is None else float(_longitude)
+                self._lat_dir   = _data.get('lat_dir')
+                self._lon_dir   = _data.get('lon_dir')
+                _altitude  = _data.get('altitude')
+                self._altitude  = 0.0 if _altitude is None else float(_altitude)
+                self._geo_sep   = _data.get('geo_sep')
+                self._gps_qual  = float(_data.get('gps_qual'))
+                self._speed     = _data.get('speed_over_ground')
+                self._pdop      = _data.get('pdop')
+                self._hdop      = _data.get('hdop')
+                self._vdop      = _data.get('vdop')
+                if self._num_sats is not None and self._num_sats > 1:
+                    _style = Style.NORMAL
+                if self._verbose:
+                    self._log.info(_style + '''
+                                      Timestamp:  {timestamp}
+                                      Latitude:   {latitude}
+                                      Longitude:  {longitude}
+                                      Lat Dir:    {lat_dir}
+                                      Long Dir:   {lon_dir}
+                                      Altitude:   {altitude}
+                                      Geo Sep:    {geo_sep}
+                                      Sats:       {num_sats}
+                                      Quality:    {gps_qual}
+                                      Speed:      {speed_over_ground}
+                                      Fix Type:   {mode_fix_type}
+                                      PDOP:       {pdop}
+                                      VDOP:       {vdop}
+                                      HDOP:       {hdop}'''.format(**_data))
+                return True
+            else:
+                self._log.info('no satellites found.')
+                return False
         else:
             self._timestamp = 'na'
             self._latitude  = 0.0

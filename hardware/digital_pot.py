@@ -36,14 +36,10 @@ class DigitalPotentiometer(Component):
     the default minimum and maximum ranges are set to zero. You must set
     the ranges prior to use.
 
-    :param config:     The application configuration.
-    :param in_min:     (optional, int or float) Minimum input value.
-    :param in_max:     (optional, int or float) Maximum input value.
-    :param out_min:    (optional, int or float) Minimum output value.
-    :param out_max:    (optional, int or float) Maximum output value.
-    :param level:      The log level.
+    :param config:       the application configuration.
+    :param i2c_address:  the optional I2C address for the IO Expander
+    :param level:        the log level.
     '''
-#   def __init__(self, config, i2c_address=None, in_min=None, in_max=None, out_min=None, out_max=None, level=Level.INFO):
     def __init__(self, config, i2c_address=None, level=Level.INFO):
 #       super().__init__()
         self._log = Logger('digital-pot', level)

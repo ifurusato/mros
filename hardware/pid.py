@@ -105,14 +105,18 @@ class PID(object):
         if self._sp_limit:
             _tmp_setpoint = self._setpoint_clip(setpoint)
             if setpoint > self._sp_limit:
+#               self._log.warning('setpoint {:5.2f} clipped; over limit: {:5.2f}'.format(setpoint, self._sp_limit))
                 self._setpoint = self._sp_limit
             elif setpoint < -1.0 * self._sp_limit:
+#               self._log.warning('setpoint {:5.2f} clipped; under limit: {:5.2f}'.format(setpoint, self._sp_limit))
                 self._setpoint = -1.0 * self._sp_limit
             else:
+#               self._log.info(Fore.GREEN + 'setpoint {:5.2f} not clipped; within limit: {:5.2f}'.format(setpoint, self._sp_limit))
                 self._setpoint = setpoint
             if _tmp_setpoint != self._setpoint:
                 raise Exception('clip didnt work.')
         else:
+#           self._log.info(Fore.GREEN + 'setpoint {:5.2f} not clipped; no limit set.'.format(setpoint))
             self._setpoint = setpoint
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

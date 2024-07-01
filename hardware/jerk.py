@@ -85,7 +85,7 @@ class JerkLimiter(Component):
             if isclose(current_value, target_value, abs_tol=self._tolerance): # if close to each other
                 self._log.info('limit current {:+06.2f} to target value {:+06.2f}.'.format(current_value, target_value))
                 pass
-            elif target_value > current_value: # increasing ..........
+            elif target_value > current_value: # increasing ┈┈┈┈┈┈┈┈┈┈
                 if not isclose(current_value, target_value, abs_tol=self._tolerance):
                     # only allow the current value plus the jerk limit
                     _value = current_value + self._jerk_rate_limit
@@ -93,7 +93,7 @@ class JerkLimiter(Component):
                 else:
                     self._log.info(Fore.BLACK + 'limit current {:+06.2f} -> target value {:+06.2f}.'.format(current_value, target_value))
 
-            else: # decreasing .......................................
+            else: # decreasing ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 if abs(current_value - target_value) > self._jerk_rate_limit:
                     # only allow the current value minus the jerk limit
                     _value = current_value - self._jerk_rate_limit

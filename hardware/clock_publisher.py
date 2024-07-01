@@ -37,7 +37,7 @@ class ClockPublisher(Publisher):
 
     Messages from the Clock are published to the asynchronous message bus,
     so timing is not assured. This clock should be used to trigger events
-    that aren't stricly time-critical but need to be scheduled every now 
+    that aren't stricly time-critical but need to be scheduled every now
     and then.
 
     :param config:            the application configuration
@@ -55,7 +55,7 @@ class ClockPublisher(Publisher):
         self._queue_publisher = globals.get('queue-publisher')
         if self._queue_publisher is None:
             raise Exception('queue publisher is not available.')
-        # configuration ................
+        # configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._irq_clock    = irq_clock
         _cfg = config['mros'].get('publisher').get('clock')
         self._divider      = _cfg.get('divider')
@@ -79,7 +79,7 @@ class ClockPublisher(Publisher):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _irq_callback_method(self):
         '''
-        This method is called by the IRQ clock. 
+        This method is called by the IRQ clock.
         '''
         if self.enabled:
             _count = next(self._counter)
@@ -87,7 +87,7 @@ class ClockPublisher(Publisher):
                 _message = self._message_factory.create_message(Event.TICK, self._millis())
                 self._queue_publisher.put(_message)
                 _elapsed_ms = int((dt.now() - self._timestamp).total_seconds() * 1000.0)
-                self._log.info('published tick: {:d}ms elapsed.'.format(_elapsed_ms))
+#               self._log.info('published tick: {:d}ms elapsed.'.format(_elapsed_ms))
                 self._timestamp = dt.now()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

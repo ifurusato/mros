@@ -57,7 +57,7 @@ class MacroSubscriber(Subscriber):
 #       self._log.info('acknowledging message {}; with payload value: {:5.2f}cm'.format(message.name, message.payload.value))
 #       message.acknowledge_sent()
 #       self._log.info('arbitrated message:    ' + Fore.WHITE + '{}'.format(message.name) 
-#               + Fore.CYAN + ' with payload for event: {}; value: {:5.2f}cm'.format(message.payload.event.label, message.payload.value))
+#               + Fore.CYAN + ' with payload for event: {}; value: {:5.2f}cm'.format(message.payload.event.name, message.payload.value))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     async def process_message(self, message):
@@ -71,13 +71,13 @@ class MacroSubscriber(Subscriber):
         if message.gcd:
             raise GarbageCollectedError('cannot process message: message has been garbage collected.')
         _event = message.event
-        self._log.info('🐸 pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.label))
+        self._log.info('🐸 pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         if _event == Event.MACRO:
-            _name = _event.label
+            _name = _event.name
             self._log.info('🐱 processing MACRO message {} with name: '.format(message.name) + Fore.YELLOW + '{}'.format(_name))
             self._macro_publisher.queue_by_name(message.payload)
         elif self.acceptable(message):
-            _name = _event.label
+            _name = _event.name
             self._log.info('🐹 processing acceptable message {} with macro name: '.format(message.name) + Fore.YELLOW + '{}'.format(_name))
             _value = message.payload.value
             self._log.info('🎃 type: {}; name {}; '.format(type(_value), _value)) # TODO react differently depending on which bumper
@@ -88,7 +88,7 @@ class MacroSubscriber(Subscriber):
 #           self._macro_publisher.queue_macro_by_name(_name, message.payload)
 #           self._macro_publisher.queue_event(message.payload)
         else:
-            self._log.warning('unrecognised {} event on message {}'.format(_event.label, message.name))
+            self._log.warning('unrecognised {} event on message {}'.format(_event.name, message.name))
         await Subscriber.process_message(self, message)
         self._log.debug('post-processing message {}'.format(message.name))
 

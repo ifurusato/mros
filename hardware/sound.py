@@ -61,26 +61,40 @@ class Sound(Enum):
     def duration(self):
         return self._duration
 
+__player = None
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 class Player(Component):
+    __instance = None
+    IOE_I2C_ADDRESS = 0x18
     '''
     A sound player that relies upon a connection between an IO Expander
     and a YS-M3 Sound Module, which has nine input pins. Bring one of them
     low will trigger a specific sound from its SD card.
-    '''
-    IOE_I2C_ADDRESS = 0x18
 
-    def __init__(self, level=Level.INFO):
-        self._log = Logger('player', level)
-        Component.__init__(self, self._log, suppressed=False, enabled=True)
-        self._ioe = io.IOE(i2c_addr=Player.IOE_I2C_ADDRESS, interrupt_pin=4)
-        for p in range(1, 10):
-            self._log.debug('setting IOE output pin {} high.'.format(p))
-            self._ioe.set_mode(p, io.OUT)
-            self._ioe.output(p, io.HIGH)
-        self._looping = False
-        self._log.info('ready.')
+    This is a singleton class; obtain its instance and play a sound via:
+
+        Player.instance().play(Sound.CHIRP_1)
+    '''
+
+    def __init__(self):
+        raise RuntimeError('singleton: call instance() instead.')
+
+    @classmethod
+    def instance(cls):
+        if cls.__instance is None:
+            cls.__instance = cls.__new__(cls)
+            # put any initialization here.
+            cls.__instance._log = Logger('player', Level.INFO)
+            Component.__init__(cls.__instance, cls.__instance._log, suppressed=False, enabled=True)
+            cls.__instance._ioe = io.IOE(i2c_addr=Player.IOE_I2C_ADDRESS, interrupt_pin=4)
+            for p in range(1, 10):
+                cls.__instance._log.debug('setting IOE output pin {} high.'.format(p))
+                cls.__instance._ioe.set_mode(p, io.OUT)
+                cls.__instance._ioe.output(p, io.HIGH)
+            cls.__instance._looping = False
+            cls.__instance._log.info('ready.')
+        return cls.__instance
 
     def loop(self, sound, count):
         '''
@@ -120,16 +134,18 @@ class Player(Component):
             self._ioe.output(_pin, io.HIGH)
             time.sleep(0.1)
 
-    def play(self, sound):
+    @staticmethod
+    def play(sound):
         '''
         Plays one of the Sound enums.
         '''
         _pin = sound.pin
         _name = sound.name
         _duration = sound.duration
-        self._log.info("playing sound '{}' on pin {} for {}s…".format(_name, _pin, _duration))
-        self._ioe.output(_pin, io.LOW)
+        _player = Player.instance()
+        _player._log.info("playing sound '{}' on pin {} for {}s…".format(_name, _pin, _duration))
+        _player._ioe.output(_pin, io.LOW)
         time.sleep(_duration)
-        self._ioe.output(_pin, io.HIGH)
+        _player._ioe.output(_pin, io.HIGH)
 
 #EOF

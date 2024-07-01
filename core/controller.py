@@ -60,7 +60,7 @@ class Controller(Component):
         '''
         Responds to the Event contained within the Payload.
         '''
-#       self._log.debug('callback with payload {}'.format(payload.event.label))
+#       self._log.debug('callback with payload {}'.format(payload.event.name))
         if not self.enabled:
             self._log.warning('action ignored: controller disabled.')
             return

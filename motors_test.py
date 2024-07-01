@@ -28,6 +28,7 @@ from core.config_loader import ConfigLoader
 from hardware.i2c_scanner import I2CScanner, DeviceNotFound
 from hardware.motor_configurer import MotorConfigurer
 from hardware.motor import Motor
+from hardware.analog_pot import AnalogPotentiometer
 from hardware.digital_pot import DigitalPotentiometer
 
 _log = Logger('test', Level.INFO)
@@ -44,6 +45,8 @@ def key_callback(event):
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 @pytest.mark.unit
 def test_motors():
+
+    _use_digital_pot = False
 
     _pfwd_motor_enabled = True
     _sfwd_motor_enabled = True
@@ -110,15 +113,16 @@ def test_motors():
         if _saft_motor_enabled:
             _i2cAddress = _saft_motor.tb.I2cAddress
             _log.info(Fore.GREEN + 'SAFT I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
-
-        if _i2c_scanner.has_hex_address(['0x0E']):
+       
+        if _use_digital_pot and _i2c_scanner.has_hex_address(['0x0E']):
             _log.info('using digital potentiometer…')
             # configure digital potentiometer for motor speed
             _pot = DigitalPotentiometer(_config, 0x0E, level=_level)
             _pot.set_input_range(IN_MIN, IN_MAX)
             _pot.set_output_range(OUT_MIN, OUT_MAX)
         else:
-            raise Exception('cannot continue: no digital potentiometer found.')
+            _pot = AnalogPotentiometer(_config, level=_level)
+#           raise Exception('cannot continue: no digital potentiometer found.')
 
         _last_scaled_value = 0.0
         _log.info('starting test…')
@@ -127,34 +131,40 @@ def test_motors():
         while True:
 
             if _pfwd_motor_enabled:
-                _pfwd_motor.update_target_velocity()
+                _pfwd_motor.update_target_speed()
             if _sfwd_motor_enabled:
-                _sfwd_motor.update_target_velocity()
+                _sfwd_motor.update_target_speed()
             if _pmid_motor_enabled:
-                _pmid_motor.update_target_velocity()
+                _pmid_motor.update_target_speed()
             if _smid_motor_enabled:
-                _smid_motor.update_target_velocity()
+                _smid_motor.update_target_speed()
             if _paft_motor_enabled:
-                _paft_motor.update_target_velocity()
+                _paft_motor.update_target_speed()
             if _saft_motor_enabled:
-                _saft_motor.update_target_velocity()
+                _saft_motor.update_target_speed()
 
-            _scaled_value = _pot.get_scaled_value(False)
+            if _use_digital_pot:
+                _scaled_value = _pot.get_scaled_value(False)
+            else:
+                _scaled_value = _pot.get_scaled_value()
+
+            _log.info(Fore.CYAN + Style.BRIGHT + 'scaled value: {}'.format(_scaled_value))
+
             if _scaled_value != _last_scaled_value: # if not the same as last time
                 # math.isclose(3, 15, abs_tol=0.03 * 255) # 3% on a 0-255 scale
                 if isclose(_scaled_value, 0.0, abs_tol=0.05 * 90):
                     _pot.set_black()
-                    if _pfwd_motor_enabled:
+                    if _pfwd_motor:
                         _pfwd_motor.target_velocity = 0.0
-                    if _sfwd_motor_enabled:
+                    if _sfwd_motor:
                         _sfwd_motor.target_velocity = 0.0
-                    if _pmid_motor_enabled:
+                    if _pmid_motor:
                         _pmid_motor.target_velocity = 0.0
-                    if _smid_motor_enabled:
+                    if _smid_motor:
                         _smid_motor.target_velocity = 0.0
-                    if _paft_motor_enabled:
+                    if _paft_motor:
                         _paft_motor.target_velocity = 0.0
-                    if _saft_motor_enabled:
+                    if _saft_motor:
                         _saft_motor.target_velocity = 0.0
                 else:
                     _pot.set_rgb(_pot.value)
@@ -170,7 +180,7 @@ def test_motors():
                         _paft_motor.target_velocity = _scaled_value
                     if _saft_motor_enabled:
                         _saft_motor.target_velocity = _scaled_value
-            _last_scaled_value = _scaled_value
+            _last_scaled_value = -1 #_scaled_value
             _rate.wait()
 
     except KeyboardInterrupt:

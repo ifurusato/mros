@@ -81,7 +81,7 @@ class Logger(object):
         :param log_to_file:    if True will subsequentially log to file, for all loggers (default False)
         :param level:          the log level
         '''
-        # configuration preliminaries ............
+        # configuration preliminaries ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         if log_to_file:
             _log_to_file = log_to_file
             globals.put('log-to-file', True)
@@ -97,7 +97,7 @@ class Logger(object):
             globals.put('log-stats', _log_stats)
         self._log_stats = _log_stats
 
-        # configuration ..........................
+        # configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _strip_ansi_codes       = True # used only with file output, to strip ANSI characters from log data
         self._include_timestamp = True
         self._date_format       = '%Y-%m-%dT%H:%M:%S'
@@ -111,7 +111,7 @@ class Logger(object):
         self.__FATAL_TOKEN = 'FATAL'
         self._mf           = '{}{} : {}{}'
 
-        # create logger ..........................
+        # create logger  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self.__mutex = threading.Lock()
         self.__log   = logging.getLogger(name)
         self.__log.propagate = False
@@ -119,7 +119,7 @@ class Logger(object):
         self._fh     = None # optional file handler
         self._sh     = None # optional stream handler
         if not self.__log.handlers:
-            if log_to_console: # log to console ................................
+            if log_to_console: # log to console ┈┈┈┈┈┈┈┈┈┈┈┈
                 self._sh = logging.StreamHandler()
                 if self._include_timestamp:
                     self._sh.setFormatter(logging.Formatter(Fore.BLUE + Style.DIM + '%(asctime)s.%(msecs)3fZ\t:' \
@@ -128,7 +128,7 @@ class Logger(object):
                 else:
                     self._sh.setFormatter(logging.Formatter('%(name)s ' + ( ' '*(16-len(name)) ) + ' : %(message)s'))
                 self.__log.addHandler(self._sh)
-            if _log_to_file: # .................................................
+            if _log_to_file: # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 # if ./log/ directory doesn't exist, create it
                 if not os.path.exists('./log'):
                     try:

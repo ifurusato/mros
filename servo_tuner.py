@@ -116,13 +116,13 @@ def test_servos():
             _last_scaled_value = _scaled_value
 
             if _selected == 0 and _enable_sfwd_servo:
-                _sfwd_servo.set_angle(int(_scaled_value))
+                _sfwd_servo.angle = int(_scaled_value)
             if _selected == 1 and _enable_pfwd_servo:
-                _pfwd_servo.set_angle(int(_scaled_value))
+                _pfwd_servo.angle = int(_scaled_value)
             if _selected == 2 and _enable_saft_servo:
-                _saft_servo.set_angle(int(_scaled_value))
+                _saft_servo.angle = int(_scaled_value)
             if _selected == 3 and _enable_paft_servo:
-                _paft_servo.set_angle(int(_scaled_value))
+                _paft_servo.angle = int(_scaled_value)
 
             _rate.wait()
 

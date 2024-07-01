@@ -23,7 +23,7 @@ from hardware.slew_rate import SlewRate
 class SlewLimiter(Component):
     '''
     A general purpose slew limiter that limits the rate of change of a value,
-    configured for managing velocity values, which vary from -90.0 to +90.0.
+    configured for managing speed values, which vary from -90.0 to +90.0.
 
     This uses the ros:slew: section of the YAML configuration.
 
@@ -63,7 +63,7 @@ class SlewLimiter(Component):
         Reset the slew rate to the default value provided in the configuration.
         '''
         self._slew_rate = self._default_slew_rate
-        self._log.info('slew rate limit reset to default of {}; {:>6.4f}/cycle.'.format(self._slew_rate.label, self._slew_rate.limit))
+        self._log.debug('slew rate limit reset to default of {}; {:>6.4f}/cycle.'.format(self._slew_rate.label, self._slew_rate.limit))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -100,7 +100,7 @@ class SlewLimiter(Component):
             return target_value
         elif isclose(target_value, current_value, abs_tol=1e-3):
             return target_value
-        elif target_value > current_value: # increasing ..........
+        elif target_value > current_value: # increasing ┈┈┈┈
             # add a percentage of difference between current and target to current
             _diff = self._slew_rate.ratio * ( target_value - current_value )
 #           if abs(_diff) < self._slew_hysteresis:
@@ -108,7 +108,7 @@ class SlewLimiter(Component):
             _value = current_value + _diff
 #           self._log.info('+value: {:+06.2f}; diff: {:06.2f} ({:3.1f}%); target: {:+06.2f}'.format(\
 #                   _value, _diff, 100.0 * self._slew_rate.ratio, target_value))
-        else: # decreasing .......................................
+        else: # decreasing ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
             # subtract a percentage of difference between current and target to current
             _diff = self._slew_rate.ratio * ( current_value - target_value )
 #           if abs(_diff) < self._slew_hysteresis:
@@ -123,5 +123,10 @@ class SlewLimiter(Component):
         self._log.info('starting slew limiter with rate limit of {:5.3f}/cycle.'.format(self._slew_rate.limit))
         self._start_time = self._millis()
         Component.enable(self)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def disable(self):
+        Component.disable(self)
+        self._log.info('disabled slew limiter.')
 
 #EOF

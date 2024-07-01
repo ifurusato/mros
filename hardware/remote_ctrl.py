@@ -31,7 +31,7 @@ class RemoteControl(object):
         self._log.info('remote control pin assignments:\t' \
                 + Fore.RED   + ' d0={:d};'.format(self._d0_pin) \
                 + Fore.BLUE  + ' d1={:d};'.format(self._d1_pin) \
-                + Fore.GREEN + ' d2={:d};'.format(self._d2_pin))
+                + Fore.GREEN + ' d2={:d}'.format(self._d2_pin))
         self._pi = None
         try:
             # establish pigpio interrupts for remote control pins

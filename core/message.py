@@ -23,7 +23,6 @@ from core.logger import Logger, Level
 from core.stringbuilder import StringBuilder
 from core.event import Event
 from core.direction import Direction
-from core.speed import Speed
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Message(object):
@@ -173,7 +172,7 @@ class Message(object):
         Sets the flag that the given processor has finished processing this message.
         '''
         if processor in self._processors:
-            raise Exception('message {} ({}) already processed by {}.'.format(self.name, self.event.label, processor.name))
+            raise Exception('message {} ({}) already processed by {}.'.format(self.name, self.event.name, processor.name))
         else:
             self._processors[processor] = True
 
@@ -279,24 +278,26 @@ class Payload(object):
     '''
     A Message's payload, containing the Event (with priority) and an optional
     value. The value can be an int, a float, or a tuple containing two ints or
-    floats, or a tuple containing a Direction and Speed. If the latter this
-    sets the 'is_motor_directive' flag True.
+    floats. 
+
     '''
     def __init__(self, event, value):
         self._event = event
         self._value = value
-        self._is_motor_directive = isinstance(value, tuple) \
-                and isinstance(value[0], Direction) and isinstance(value[1], Speed)
+#   or a tuple containing a Direction and Speed. If the latter this
+#   sets the 'is_motor_directive' flag True.
+#       self._is_motor_directive = isinstance(value, tuple) \
+#               and isinstance(value[0], Direction) and isinstance(value[1], Speed)
 
     # is motor directive ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
-    @property
-    def is_motor_directive(self):
-        '''
-        Returns True if the arguments to the Payload was a tuple containing
-        a Direction and Speed.
-        '''
-        return self._is_motor_directive
+#   @property
+#   def is_motor_directive(self):
+#       '''
+#       Returns True if the arguments to the Payload was a tuple containing
+#       a Direction and Speed.
+#       '''
+#       return self._is_motor_directive
 
     # priority ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
