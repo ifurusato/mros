@@ -42,8 +42,6 @@ class DigitalPotentiometer(Component):
     '''
     def __init__(self, config, i2c_address=None, level=Level.INFO):
 #       super().__init__()
-        self._log = Logger('digital-pot', level)
-        Component.__init__(self, self._log, suppressed=False, enabled=True)
         if config is None:
             raise ValueError('no configuration provided.')
         _cfg = config['mros'].get('hardware').get('digital_potentiometer')
@@ -53,6 +51,8 @@ class DigitalPotentiometer(Component):
             self._i2c_addr = i2c_address
         else:
             self._i2c_addr = _cfg.get('i2c_address')
+        self._log = Logger('digital-pot-0x{:02X}'.format(self._i2c_addr), level)
+        Component.__init__(self, self._log, suppressed=False, enabled=True)
         self._pin_red    = _cfg.get('pin_red')
         self._pin_green  = _cfg.get('pin_green')
         self._pin_blue   = _cfg.get('pin_blue')

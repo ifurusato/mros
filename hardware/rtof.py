@@ -100,7 +100,7 @@ class RangingToF(Component):
         vl53.set_integration_time_ms(20)
         vl53.set_ranging_mode(RANGING_MODE_CONTINUOUS)
         executionMs = int((datetime.datetime.now() - stime).total_seconds() * 1000)
-        self._log.info(Fore.BLUE + 'get VL53: {}ms elapsed.'.format(executionMs) + Style.RESET_ALL)
+        self._log.info(Fore.BLUE + 'get VL53: {}ms elapsed.'.format(executionMs))
         return vl53
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

@@ -36,7 +36,7 @@ try:
 
     _config = ConfigLoader(Level.INFO).configure()
     _screen = Screen(_config, Level.INFO)
-    _screen.off()
+#   _screen.disable()
 
     _log.info("scanning for thunderborgs...")
     ScanForThunderBorg()
@@ -53,11 +53,13 @@ try:
     if _tb1:
         _tb1.SetLedShowBattery(False)
         _tb1.SetLeds(0.0, 0.0, 0.0) # black
+        pass
 
     # thunderborg 2 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     if _tb2:
         _tb2.SetLedShowBattery(False)
         _tb2.SetLeds(0.0, 0.0, 0.0) # black
+        pass
 
     _log.info("done.")
 

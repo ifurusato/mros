@@ -116,14 +116,15 @@ class SensorArray(Publisher):
         # thread support
 #       self._thread = None
 #       self._thread_enabled = False
+        self._suppressed = []
         self._verbose  = False
 
         # configure board
-        _i2c_scanner = I2CScanner(config, level)
+        _i2c_scanner = I2CScanner(config, bus_number=1, level=level)
 
         try:
             if _i2c_scanner.has_address([self._fwd_i2c_address]):
-                self._log.info('found forward IO Expander at address 0x{:2X}, configuring…'.format(self._fwd_i2c_address))
+                self._log.info('found forward IO Expander at address 0x{:02X}, configuring…'.format(self._fwd_i2c_address))
                 self._fwd_ioe = io.IOE(i2c_addr=self._fwd_i2c_address)
                 # configure digital pins ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 self._fwd_ioe.set_mode(self._bsb_pin, io.IN_PU) # bumper starboard bottom
@@ -143,7 +144,7 @@ class SensorArray(Publisher):
                 raise Exception('no forward IO Expander found.')
 
             if _i2c_scanner.has_address([self._aft_i2c_address]):
-                self._log.info('found aft IO Expander at address 0x{:2X}, configuring…'.format(self._aft_i2c_address))
+                self._log.info('found aft IO Expander at address 0x{:02X}, configuring…'.format(self._aft_i2c_address))
                 self._aft_ioe = io.IOE(i2c_addr=self._aft_i2c_address)
                 # configure digital pins ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 self._aft_ioe.set_mode(self._mast_pin, io.IN_PU) # bumper starboard bottom
@@ -170,7 +171,6 @@ class SensorArray(Publisher):
             if self._message_bus.get_task_by_name(SensorArray._LISTENER_LOOP_NAME):
                 self._log.warning('already enabled.')
             else:
-                self._log.info('♐ creating task…')
                 self._log.info('creating task for sensor array monitor loop…')
                 self._message_bus.loop.create_task(self._monitor_loop(lambda: self.enabled), name=SensorArray._LISTENER_LOOP_NAME)
             self._log.info('enabled.')
@@ -205,6 +205,18 @@ class SensorArray(Publisher):
         else:
             Publisher.suppress(self)
             self._log.info('sensor array suppressed.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def suppress_events(self, events):
+        '''
+        Suppresses the set of Events. Calling this method with a None argument
+        will clear the list.
+        '''
+        if events is None:
+            self._suppressed.clear()
+        else:
+            for _event in events:
+                self._suppressed.append(_event)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable(self):
@@ -366,21 +378,21 @@ class SensorArray(Publisher):
             _now_ts = dt.timestamp(dt.now())
     
             # mast sensor trigger ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-            if self._aft_ioe.input(self._mast_pin) == 0: # mast IR
+            if Event.BUMPER_MAST not in self._suppressed and self._aft_ioe.input(self._mast_pin) == 0: # mast IR
                 self._mast_triggered = _now_ts
             # set bumper triggers ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-            if self._fwd_ioe.input(self._bpb_pin) == 0 or self._fwd_ioe.input(self._bpt_pin) == 0:
+            if Event.BUMPER_PORT not in self._suppressed and self._fwd_ioe.input(self._bpb_pin) == 0 or self._fwd_ioe.input(self._bpt_pin) == 0:
                 self._port_bmp_triggered = _now_ts
-            if self._fwd_ioe.input(self._bsb_pin) == 0 or self._fwd_ioe.input(self._bst_pin) == 0:
+            if Event.BUMPER_STBD not in self._suppressed and self._fwd_ioe.input(self._bsb_pin) == 0 or self._fwd_ioe.input(self._bst_pin) == 0:
                 self._stbd_bmp_triggered = _now_ts
             # set wheel sensor triggers ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-            if self._fwd_ioe.input(self._wsa_pin) == 0: # wheel starboard aft
+            if Event.BUMPER_SAFT not in self._suppressed and self._fwd_ioe.input(self._wsa_pin) == 0: # wheel starboard aft
                 self._saft_triggered = _now_ts
-            if self._fwd_ioe.input(self._wsf_pin) == 0: # wheel starboard fwd
+            if Event.BUMPER_SFWD not in self._suppressed and self._fwd_ioe.input(self._wsf_pin) == 0: # wheel starboard fwd
                 self._sfwd_triggered = _now_ts
-            if self._fwd_ioe.input(self._wpa_pin) == 0: # wheel port aft
+            if Event.BUMPER_PAFT not in self._suppressed and self._fwd_ioe.input(self._wpa_pin) == 0: # wheel port aft
                 self._paft_triggered = _now_ts
-            if self._fwd_ioe.input(self._wpf_pin) == 0: # wheel port fwd
+            if Event.BUMPER_PFWD not in self._suppressed and self._fwd_ioe.input(self._wpf_pin) == 0: # wheel port fwd
                 self._pfwd_triggered = _now_ts
     
             if self._verbose:
@@ -415,14 +427,14 @@ class SensorArray(Publisher):
                     _wsf_msg = Fore.GREEN + Style.NORMAL + 'wheel stbd fwd: no'
     
                 self._log.info(Fore.WHITE + '\nstatus:\n    {}\n    {}\n    {}\n    {}\n    {}\n    {}\n    {}'.format(
-                        _mast_msg, _bp_msg, _bs_msg, _wsa_msg, _wsf_msg, _wpa_msg, _wpf_msg) + Style.RESET_ALL)
+                        _mast_msg, _bp_msg, _bs_msg, _wsa_msg, _wsf_msg, _wpa_msg, _wpf_msg))
     
             # analog pins ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
             self._fop_cm = int(Util.convert_to_distance(self.get_fop_value())) # oblique fore port IR distance
-            if self._fop_cm < self._oblique_trigger_cm: # 20cm
+            if Event.BUMPER_FOBP not in self._suppressed and self._fop_cm < self._oblique_trigger_cm: # 20cm
                 self._fobp_triggered = _now_ts
             self._fos_cm = int(Util.convert_to_distance(self.get_fos_value())) # oblique fore starboard IR distance
-            if self._fos_cm < self._oblique_trigger_cm: # 20cm
+            if Event.BUMPER_FOBS not in self._suppressed and self._fos_cm < self._oblique_trigger_cm: # 20cm
                 self._fobs_triggered = _now_ts
     
             # display ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -467,7 +479,6 @@ class SensorArray(Publisher):
 
 #           self._log.info(Fore.BLUE + 'asyncio.sleep…')
             await asyncio.sleep(self._publish_delay_sec)
-
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def external_callback_method(self):
@@ -521,7 +532,7 @@ class SensorArray(Publisher):
                 _wsf_msg = Fore.GREEN + Style.NORMAL + 'wheel stbd fwd: no'
 
             self._log.info(Fore.WHITE + '\nstatus:\n    {}\n    {}\n    {}\n    {}\n    {}\n    {}'.format(
-                    _bp_msg, _bs_msg, _wsa_msg, _wsf_msg, _wpa_msg, _wpf_msg) + Style.RESET_ALL)
+                    _bp_msg, _bs_msg, _wsa_msg, _wsf_msg, _wpa_msg, _wpf_msg))
 
         # analog pins ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._fop_cm = int(Util.convert_to_distance(self.get_fop_value())) # oblique fore port IR distance

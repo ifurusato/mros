@@ -20,7 +20,7 @@ from core.orientation import Orientation
 from core.speed import Speed
 from core.message_bus import MessageBus
 from hardware.pid_ctrl import PIDController
-from hardware.slew import SlewLimiter
+from hardware.slew_limiter import SlewLimiter
 from hardware.jerk import JerkLimiter
 from hardware.velocity import Velocity
 

@@ -138,7 +138,7 @@ class RemoteControlSubscriber(Subscriber):
         Plays the associated sound.
         '''
         if sound:
-            print(Fore.MAGENTA + "sound: '{}'".format(sound.name) + Style.RESET_ALL)
+            print(Fore.MAGENTA + "sound: '{}'".format(sound.name))
             self._player.play(sound)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -146,7 +146,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the A button.
         '''
-        print(Fore.MAGENTA + Style.DIM + "0. A message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.DIM + "0. A message: '{}'".format(value))
         self._set_color(Color.BLACK)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -154,7 +154,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the B button.
         '''
-        print(Fore.MAGENTA + Style.DIM + "1. B message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.DIM + "1. B message: '{}'".format(value))
         self._set_color(Color.MAGENTA)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -162,7 +162,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the Y button.
         '''
-        print(Fore.MAGENTA + Style.BRIGHT + "2. Y message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.BRIGHT + "2. Y message: '{}'".format(value))
         self._set_color(Color.ORANGE)
         self.startup()
 
@@ -171,7 +171,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the X button.
         '''
-        print(Fore.MAGENTA + Style.BRIGHT + "3. X message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.BRIGHT + "3. X message: '{}'".format(value))
         self._set_color(Color.CYAN)
         # TODO send Event.SHUTDOWN
         self._mros.shutdown()
@@ -181,7 +181,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the Down arrow button.
         '''
-        print(Fore.MAGENTA + Style.DIM + "4. DOWN message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.DIM + "4. DOWN message: '{}'".format(value))
         self._set_color(Color.YELLOW)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -189,7 +189,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the Right arrow button.
         '''
-        print(Fore.MAGENTA + Style.DIM + "5. RIGHT message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.DIM + "5. RIGHT message: '{}'".format(value))
         self._set_color(Color.GREEN)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -197,7 +197,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the Up arrow button.
         '''
-        print(Fore.MAGENTA + Style.BRIGHT + "6. UP message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.BRIGHT + "6. UP message: '{}'".format(value))
         self._set_color(Color.BLUE)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -205,7 +205,7 @@ class RemoteControlSubscriber(Subscriber):
         '''
         Reacts to the Left arrow button.
         '''
-        print(Fore.MAGENTA + Style.DIM + "7. LEFT message: '{}'".format(value) + Style.RESET_ALL)
+        print(Fore.MAGENTA + Style.DIM + "7. LEFT message: '{}'".format(value))
         self._set_color(Color.RED)
 
     # actions ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -215,9 +215,11 @@ class RemoteControlSubscriber(Subscriber):
         _motor_configurer = self._mros.get_motor_configurer()
         _motor_configurer.set_thunderborg_leds(False)
         _screen = self._mros.get_screen()
-        _screen.off() 
+        if _screen:
+            _screen.disable() 
         _status_light = self._mros.get_status_light()
-        _status_light.enable()
+        if _status_light:
+            _status_light.enable()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _clear(self, show=True):

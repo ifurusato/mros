@@ -110,6 +110,7 @@ class Logger(object):
         self.__ERROR_TOKEN = 'ERROR'
         self.__FATAL_TOKEN = 'FATAL'
         self._mf           = '{}{} : {}{}'
+        _1st_col_width     = 14
 
         # create logger  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self.__mutex = threading.Lock()
@@ -123,10 +124,10 @@ class Logger(object):
                 self._sh = logging.StreamHandler()
                 if self._include_timestamp:
                     self._sh.setFormatter(logging.Formatter(Fore.BLUE + Style.DIM + '%(asctime)s.%(msecs)3fZ\t:' \
-                            + Fore.RESET + ' %(name)s ' + ( ' '*(16-len(name)) ) + ' : %(message)s', datefmt=self._date_format))
-#                   self._sh.setFormatter(logging.Formatter('%(asctime)s.%(msecs)06f  %(name)s ' + ( ' '*(16-len(name)) ) + ' : %(message)s', datefmt=self._date_format))
+                            + Fore.RESET + ' %(name)s ' + ( ' '*(_1st_col_width-len(name)) ) + ' : %(message)s', datefmt=self._date_format))
+#                   self._sh.setFormatter(logging.Formatter('%(asctime)s.%(msecs)06f  %(name)s ' + ( ' '*(_1st_col_width-len(name)) ) + ' : %(message)s', datefmt=self._date_format))
                 else:
-                    self._sh.setFormatter(logging.Formatter('%(name)s ' + ( ' '*(16-len(name)) ) + ' : %(message)s'))
+                    self._sh.setFormatter(logging.Formatter('%(name)s ' + ( ' '*(_1st_col_width-len(name)) ) + ' : %(message)s'))
                 self.__log.addHandler(self._sh)
             if _log_to_file: # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 # if ./log/ directory doesn't exist, create it
@@ -369,7 +370,6 @@ class Logger(object):
         else:
             return Fore.WHITE + Style.BRIGHT + Util.repeat(_H, _hyphen_width) + _L + Fore.CYAN + Style.NORMAL\
                     + message + Fore.WHITE + Style.BRIGHT + _R + Util.repeat(_H, _hyphen_width-1)
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class LogStats(object):

@@ -60,7 +60,7 @@ class ExperimentManager(Component):
                         _num = len(self._registry) + Event.EXPERIMENT_1.num
                         _event = Event.from_number(_num)
                         self._log.info('created experiment: {} from module {} in slot {:d} for event: {}'.format(
-                                _experiment.name, _module_name, _num, _event.label))
+                                _experiment.name, _module_name, _num, _event.name))
                         self._registry[_event] = _experiment
                         self._log.debug('enabling registered experiment {}.'.format(_experiment.name))
                     else:
@@ -87,7 +87,7 @@ class ExperimentManager(Component):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def register_experiment(self, event, experiment):
         self._registry[event] = experiment
-        self._log.info('registered experiment {} to event {}.'.format(experiment.name, event.label))
+        self._log.info('registered experiment {} to event {}.'.format(experiment.name, event.name))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def toggle_experiment(self, event):
@@ -109,7 +109,7 @@ class ExperimentManager(Component):
         for _event in self._registry.keys():
             _experiment = self._registry.get(_event)
             self._log.info('  experiment: ' + Fore.YELLOW + '{}'.format(_experiment.name)
-                    + Fore.CYAN + '; registered for event: ' + Fore.YELLOW + '{}'.format(_event.label))
+                    + Fore.CYAN + '; registered for event: ' + Fore.YELLOW + '{}'.format(_event.name))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):

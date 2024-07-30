@@ -17,7 +17,7 @@ import RPi.GPIO as GPIO
 from colorama import init, Fore, Style
 init()
 
-# ..............................................................................
+# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 class Pin():
     def __init__(self, pin, label):
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -28,18 +28,18 @@ class Pin():
 
     def get(self):
         '''
-            Change the NORMAL and BRIGHT as desired,
+        Change the NORMAL and BRIGHT as desired,
         '''
         if GPIO.input(self._pin): # if low
             return Fore.GREEN + Style.NORMAL + self._label
         else:
             return Fore.GREEN + Style.BRIGHT + self._label
 
-# ..............................................................................
+# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def main():
     try:
 
-        TITLE = 'Raspberry Pi 3 B+ Pinout'
+        TITLE = 'Raspberry Pi 4 Pinout'
         DELAY_TIME_SEC = 0.5
         GND = Fore.BLACK + Style.DIM    + 'GND   '
         CYAN_NORMAL = Fore.CYAN + Style.NORMAL
@@ -49,7 +49,7 @@ def main():
 
         GPIO.setmode(GPIO.BOARD)
 
-        # column 1 ..............
+        # column 1 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _pin07 = Pin(7, 'GPIO4')
         _pin11 = Pin(11,'GPIO17')
         _pin13 = Pin(13,'GPIO27')
@@ -66,7 +66,7 @@ def main():
         _pin37 = Pin(37,'GPIO26')
         # GND 39
 
-        # column 2 ..............
+        # column 2 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _pin08 = Pin(8, 'GPIO14')
         _pin10 = Pin(10,'GPIO15')
         _pin12 = Pin(12,'GPIO18')
@@ -84,7 +84,6 @@ def main():
         _pin36 = Pin(36,'GPIO16')
         _pin38 = Pin(38,'GPIO20')
         _pin40 = Pin(40,'GPIO21')
-
 
         _counter = itertools.count()
 
@@ -118,14 +117,11 @@ def main():
             print('\n\n' + Fore.BLACK + _style + INDENT + Style.NORMAL + '\tpoll {}  \tType Ctrl-C to exit.'.format(count) + Style.RESET_ALL)
             time.sleep(DELAY_TIME_SEC)
 
-
     except KeyboardInterrupt:
         print('Ctrl-C caught, exiting...')
         sys.exit(0)
 
-
 if __name__== "__main__":
     main()
-
 
 #EOF

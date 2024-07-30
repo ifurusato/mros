@@ -45,6 +45,7 @@ class PID(object):
         self._min_output   = min_output
         self._max_output   = max_output
         self._sp_limit     = None
+        self._target       = 0.0
         self._setpoint_clip = lambda n: ( -1.0 * self._sp_limit ) if n <= ( -1.0 * self._sp_limit ) \
                 else self._sp_limit if n >= self._sp_limit \
                 else n
@@ -138,19 +139,19 @@ class PID(object):
         self._sp_limit = limit
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def __call__(self, target, dt=None):
+    def __call__(self, dt=None):
         '''
-        Call the PID controller with a target value and calculate and return
-        a control output if period (sample time in seconds) has passed since
-        the last update. If no new output is calculated, return the previous
-        output instead (or None if no value has been calculated yet).
+        Call the PID controller and calculate and return a control output if
+        the period (sample time in seconds) has passed since the last update.
+        If no new output is calculated, return the previous output instead
+        (or None if no value has been calculated yet).
 
         :param target: the target value for the setpoint.
         :param dt: If set, uses this value for timestep instead of real time.
                    This can be used in simulations when simulation time is
                    different from real time.
         '''
-#       self._log.info(Fore.RED + Style.BRIGHT + 'PID.__call__() setpoint: {:5.2f}; target: {:5.2f}; dt: {}'.format(self._setpoint, target, dt))
+#       self._log.info(Fore.RED + Style.BRIGHT + 'PID.__call__() setpoint: {:5.2f}; target: {:5.2f}; dt: {}'.format(self._setpoint, self._target, dt))
         _now = time.monotonic()
         if dt is None:
             dt = _now - self._last_time
@@ -162,31 +163,44 @@ class PID(object):
             output = self._last_output
         else:
             # compute error terms
-            _error = self._setpoint - target
-            d_input = target - (self._last_input if self._last_input is not None else target)
-
+            _error = self._setpoint - self._target
+            d_input = self._target - (self._last_input if self._last_input is not None else self._target)
             # compute the proportional, integral and derivative terms
             self._proportional = self._kp * _error
             self._integral    += self._ki * _error * dt
             self._integral     = self._clip(self._integral) # avoid integral windup
             self._derivative   = -self._kd * d_input / dt
-
             # compute output, clipped to limits
             output = self._clip(self._proportional + self._integral + self._derivative)
-
             kp, ki, kd = self.constants
             cp, ci, cd = self.components
 #           self._log.info('dt={:7.4f}ms '.format(dt * 1000.0) \
-#                   + Fore.CYAN + Style.DIM + 'target={:5.2f}; error={:6.3f};'.format(target, _error) \
+#                   + Fore.CYAN + Style.DIM + 'self._target={:5.2f}; error={:6.3f};'.format(self._target, _error) \
 #                   + Fore.MAGENTA + ' KP={:<8.5f}; KD={:<8.5f};'.format(kp, kd) \
 #                   + Fore.CYAN + Style.BRIGHT + ' P={:8.5f}; I={:8.5f}; D={:8.5f}; sp={:6.3f};'.format(cp, ci, cd, self._setpoint) \
 #                   + Style.BRIGHT + ' out: {:<8.5f}'.format(output))
             self._last_output = output
 
         # keep track of state
-        self._last_input  = target
+        self._last_input  = self._target
         self._last_time   = _now
         return output
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def target(self):
+        '''
+        Return the current target speed.
+        '''
+        return self._target
+
+    @target.setter
+    def target(self, target):
+        '''
+        Setter for the output limits using a tuple: (lower, upper).
+        Setting 'None' for a value means there is no limit.
+        '''
+        self._target = target
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -222,7 +236,6 @@ class PID(object):
         '''
         return self._kp, self._ki, self._kd
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @tunings.setter
     def tunings(self, tunings):
         '''
@@ -239,7 +252,6 @@ class PID(object):
         '''
         return self._min_output, self._max_output
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @output_limits.setter
     def output_limits(self, limits):
         '''

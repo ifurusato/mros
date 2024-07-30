@@ -59,7 +59,7 @@ class StopHandler(Component):
         if message.gcd:
             raise GarbageCollectedError('cannot process message: message has been garbage collected. [3]')
         _event = message.event
-        self._log.info('♊ pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
+        self._log.info('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         _value = message.value
         if _event.num != self._last_event:
             if _event.num == Event.EMERGENCY_STOP.num:
@@ -80,7 +80,6 @@ class StopHandler(Component):
         returns zero), or at such time when there are no lambdas operating 
         on this or any other motor, in which case it returns the name of 
         the lambda as a signal that the robot has stopped.
-
         '''
         target_speed = target_speed * self._brake_ratio
         if self._motor_controller.all_motors_are_stopped:
@@ -92,11 +91,18 @@ class StopHandler(Component):
             return target_speed
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def stop(self):
+        '''
+        Quickly stops the robot.
+        '''
+        self._stop(Event.STOP)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _stop(self, event):
         '''
         Slowly coasts all motors to a stop.
         '''
-        self._log.info(Fore.GREEN + Style.BRIGHT + "STOP event: '{}'".format(event.name) + Style.RESET_ALL)
+        self._log.info(Fore.GREEN + Style.BRIGHT + "STOP event: '{}'".format(event.name))
 #       if self.is_stopped:
 #           self._log.warning('already braked.')
 #           return
@@ -106,11 +112,11 @@ class StopHandler(Component):
 #       else:
 #           self._log.info('braking…')
         if self._slew_limiter_enabled:
-            self._log.info('stopping soft…')
+            self._log.info(Fore.YELLOW + 'stopping motors…') # stopping soft
             for _motor in self._all_motors:
-                if not _motor.has_speed_multiplier(StopHandler.STOP_LAMBDA_NAME):
-                    self._log.info(Fore.YELLOW + 'adding stopping lambda to {} motor…'.format(_motor.orientation.name))
-                    _motor.add_speed_multiplier(StopHandler.STOP_LAMBDA_NAME, self._stopping_lambda)
+#               self._log.info(Fore.YELLOW + 'adding stopping lambda to {} motor…'.format(_motor.orientation.name))
+                _motor.clear_speed_multipliers()
+                _motor.add_speed_multiplier(StopHandler.STOP_LAMBDA_NAME, self._stopping_lambda)
         else:   
             self._log.info('stopping hard…')
             for _motor in self._all_motors:

@@ -20,6 +20,9 @@ class Speed(Enum):
     Provides an enumeration of both ahead (forward) and astern (reverse)
     Chadburn-style speeds, as corresponding to an abstract speed value.
 
+    NOTE: the speed values here are not used for motor control; those would
+    the values enumerated by the Chadburn class.
+
     The default values for astern and ahead proportional power are initially
     set to zero; these must be set from the YAML application configuration
     via the configure() method.

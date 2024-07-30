@@ -18,7 +18,7 @@
 #     TB1 = ThunderBorg.ThunderBorg()
 #     TB2 = ThunderBorg.ThunderBorg()
 #     TB1.i2cAddress = 0x15
-#     TB2.i2cAddress = 0x1516
+#     TB2.i2cAddress = 0x16
 #     TB1.Init()
 #     TB2.Init()
 #     # User code here, use TB1 and TB2 to control each board separately
@@ -84,6 +84,7 @@ COMMAND_VALUE_OFF           = 0     # I2C value representing off
 
 COMMAND_ANALOG_MAX          = 0x3FF # Maximum value for analog readings
 
+_log = Logger('thunderborg-cl', Level.INFO)
 
 def ScanForThunderBorg(busNumber = 1):
     '''
@@ -93,7 +94,7 @@ Scans the I2C bus for a ThunderBorg boards and returns a list of all usable addr
 The busNumber if supplied is which I2C bus to scan, 0 for Rev 1 boards, 1 for Rev 2 boards, if not supplied the default is 1
     '''
     found = []
-    print('Scanning I2C bus #{:d}'.format(busNumber))
+    _log.info('Scanning I2C bus #{:d}'.format(busNumber))
     bus = ThunderBorg(Level.INFO)
     for address in range(0x03, 0x78, 1):
         try:
@@ -101,7 +102,7 @@ The busNumber if supplied is which I2C bus to scan, 0 for Rev 1 boards, 1 for Re
             i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_MAX_LEN)
             if len(i2cRecv) == I2C_MAX_LEN:
                 if i2cRecv[1] == I2C_ID_THUNDERBORG:
-                    print('Found ThunderBorg at 0x{:02X}'.format(address))
+                    _log.info('Found ThunderBorg at 0x{:02X}'.format(address))
                     found.append(address)
                 else:
                     pass
@@ -112,11 +113,11 @@ The busNumber if supplied is which I2C bus to scan, 0 for Rev 1 boards, 1 for Re
         except:
             pass
     if len(found) == 0:
-        print('No ThunderBorg boards found, is bus #{:d} correct (should be 0 for Rev 1, 1 for Rev 2)'.format(busNumber))
+        _log.warning('No ThunderBorg boards found, is bus #{:d} correct (should be 0 for Rev 1, 1 for Rev 2)'.format(busNumber))
     elif len(found) == 1:
-        print('1 ThunderBorg board found')
+        _log.info('1 ThunderBorg board found')
     else:
-        print('{:d} ThunderBorg boards found'.format(len(found)))
+        _log.info('{:d} ThunderBorg boards found'.format(len(found)))
     return found
 
 
@@ -130,19 +131,19 @@ The busNumber if supplied is which I2C bus to scan, 0 for Rev 1 boards, 1 for Re
 Warning, this new I2C address will still be used after resetting the power on the device
     """
     if newAddress < 0x03:
-        print('Error, I2C addresses below 3 (0x03) are reserved, use an address between 3 (0x03) and 119 (0x77)')
+        _log.error('Error, I2C addresses below 3 (0x03) are reserved, use an address between 3 (0x03) and 119 (0x77)')
         return
     elif newAddress > 0x77:
-        print('Error, I2C addresses above 119 (0x77) are reserved, use an address between 3 (0x03) and 119 (0x77)')
+        _log.error('Error, I2C addresses above 119 (0x77) are reserved, use an address between 3 (0x03) and 119 (0x77)')
         return
     if oldAddress < 0x0:
         found = ScanForThunderBorg(busNumber)
         if len(found) < 1:
-            print('No ThunderBorg boards found, cannot set a new I2C address!')
+            _log.warning('No ThunderBorg boards found, cannot set a new I2C address!')
             return
         else:
             oldAddress = found[0]
-    print('Changing I2C address from 0x{:02X} to 0x{:02X} (bus #{:d})'.format(oldAddress, newAddress, busNumber))
+    _log.info('Changing I2C address from 0x{:02X} to 0x{:02X} (bus #{:d})'.format(oldAddress, newAddress, busNumber))
     bus = ThunderBorg(Level.INFO)
     bus.InitBusOnly(busNumber, oldAddress)
     try:
@@ -150,44 +151,44 @@ Warning, this new I2C address will still be used after resetting the power on th
         if len(i2cRecv) == I2C_MAX_LEN:
             if i2cRecv[1] == I2C_ID_THUNDERBORG:
                 foundChip = True
-                print('Found ThunderBorg at 0x{:02X}'.format(oldAddress))
+                _log.info('Found ThunderBorg at 0x{:02X}'.format(oldAddress))
             else:
                 foundChip = False
-                print('Found a device at 0x{:02X}, but it is not a ThunderBorg (ID 0x{:02X} instead of 0x{:02X})'.format(oldAddress, i2cRecv[1], I2C_ID_THUNDERBORG))
+                _log.warning('Found a device at 0x{:02X}, but it is not a ThunderBorg (ID 0x{:02X} instead of 0x{:02X})'.format(oldAddress, i2cRecv[1], I2C_ID_THUNDERBORG))
         else:
             foundChip = False
-            print('Missing ThunderBorg at 0x{:02X}'.format(oldAddress))
+            _log.warning('Missing ThunderBorg at 0x{:02X}'.format(oldAddress))
     except KeyboardInterrupt:
         raise
     except:
         foundChip = False
-        print('Missing ThunderBorg at 0x{:02X}'.format(oldAddress))
+        _log.warning('Missing ThunderBorg at 0x{:02X}'.format(oldAddress))
     if foundChip:
         bus.RawWrite(COMMAND_SET_I2C_ADD, [newAddress])
         time.sleep(0.1)
-        print('Address changed to 0x{:02X}, attempting to talk with the new address'.format(newAddress))
+        _log.info('Address changed to 0x{:02X}, attempting to talk with the new address'.format(newAddress))
         try:
             bus.InitBusOnly(busNumber, newAddress)
             i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_MAX_LEN)
             if len(i2cRecv) == I2C_MAX_LEN:
                 if i2cRecv[1] == I2C_ID_THUNDERBORG:
                     foundChip = True
-                    print('Found ThunderBorg at 0x{:02X}'.format(newAddress))
+                    _log.info('Found ThunderBorg at 0x{:02X}'.format(newAddress))
                 else:
                     foundChip = False
-                    print('Found a device at 0x{:02X}, but it is not a ThunderBorg (ID 0x{:02X} instead of 0x{:02X})'.format(newAddress, i2cRecv[1], I2C_ID_THUNDERBORG))
+                    _log.warning('Found a device at 0x{:02X}, but it is not a ThunderBorg (ID 0x{:02X} instead of 0x{:02X})'.format(newAddress, i2cRecv[1], I2C_ID_THUNDERBORG))
             else:
                 foundChip = False
-                print('Missing ThunderBorg at 0x{:02X}'.format(newAddress))
+                _log.warning('Missing ThunderBorg at 0x{:02X}'.format(newAddress))
         except KeyboardInterrupt:
             raise
         except:
             foundChip = False
-            print('Missing ThunderBorg at 0x{:02X}'.format(newAddress))
+            _log.warning('Missing ThunderBorg at 0x{:02X}'.format(newAddress))
     if foundChip:
-        print('New I2C address of 0x{:02X} set successfully'.format(newAddress))
+        _log.info('New I2C address of 0x{:02X} set successfully'.format(newAddress))
     else:
-        print('Failed to set new I2C address...')
+        _log.error('Failed to set new I2C address...')
 
 
 # Class used to control ThunderBorg

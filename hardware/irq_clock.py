@@ -10,6 +10,7 @@
 # see the LICENSE file included as part of this package.
 #
 
+import itertools
 from datetime import datetime as dt
 from colorama import init, Fore, Style
 init()
@@ -39,15 +40,22 @@ class IrqClock(Component):
     :param level:      the logging level.
     '''
     def __init__(self, config, pin=None, level=Level.INFO):
-        self._log = Logger('irq-clock', level)
+        if pin is None:
+            self._log = Logger('irq-clock', level)
+        else:
+#           self._log = Logger('irq-clock-{:d}'.format(pin), level)
+            self._log = Logger('irq-clock-slo', level)
         Component.__init__(self, self._log, suppressed=False, enabled=True)
         if config is None:
             raise ValueError('no configuration provided.')
         _cfg = config['mros'].get('hardware').get('irq_clock')
-        self._initd        = False
-        self.__callbacks   = []
-        self._pi           = None
-        self._pi_callback  = None
+        self._initd         = False
+        self._counter       = itertools.count()
+        self.__callbacks    = []
+        self.__lf_callbacks = []
+        self._freq_divider  = _cfg.get('freq_divider')
+        self._pi            = None
+        self._pi_callback   = None
         self._pin = pin if pin else _cfg.get('pin')
         self._log.info('IRQ clock pin:\t{:d}'.format(self._pin))
         self._log.info('ready.')
@@ -86,10 +94,27 @@ class IrqClock(Component):
         '''
         Adds a callback to those triggered by clock ticks.
         '''
+        if not callable(callback):
+            raise Exception('callback argument is not a function.')
         if callback:
             if callback in self.__callbacks:
                 raise Exception('callback already exists.')
             self.__callbacks.append(callback)
+        else:
+            raise TypeError('null callback argument')
+
+     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def add_low_frequency_callback(self, callback):
+        '''
+        Adds a callback to those triggered by clock ticks, called at a
+        lower frequency than the regular callbacks.
+        '''
+        if not callable(callback):
+            raise Exception('callback argument is not a function.')
+        if callback:
+            if callback in self.__lf_callbacks:
+                raise Exception('callback already exists.')
+            self.__lf_callbacks.append(callback)
         else:
             raise TypeError('null callback argument')
 
@@ -105,10 +130,12 @@ class IrqClock(Component):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _callback_method(self, gpio, level, tick):
-#       self._log.info('IRQ clock callback triggered.')
         if self.enabled:
             for callback in self.__callbacks:
                 callback()
+            if next(self._counter) % self._freq_divider == 0:
+                for lf_callback in self.__lf_callbacks:
+                    lf_callback()
 #       else:
 #           self._log.warning('IRQ clock disabled.')
 

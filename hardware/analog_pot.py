@@ -40,7 +40,7 @@ class AnalogPotentiometer(object):
         # configure IO Expander board
         _i2c_scanner = I2CScanner(config, level)
         if _i2c_scanner.has_address([self._i2c_address]):
-            self._log.info('found IO Expander at address 0x{:2X}, configuring…'.format(self._i2c_address))
+            self._log.info('found IO Expander at address 0x{:02X}, configuring…'.format(self._i2c_address))
             try:
                 self._log.info('instantiating IO Expander…')
                 self._ioe = io.IOE(i2c_addr=self._i2c_address)

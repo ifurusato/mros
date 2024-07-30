@@ -201,7 +201,7 @@ class MotorConfigurer():
                 _thunderborg_address = self._config['mros'].get('motor').get('thunderborg_aft_address')
             else:
                 raise Exception('expected FWD or AFT orientation.')
-            self._log.info(Fore.MAGENTA + 'importing ThunderBorg for orientation {} at address 0x{:02X}…'.format(orientation.name, _thunderborg_address) + Style.RESET_ALL)
+            self._log.info(Fore.MAGENTA + 'importing ThunderBorg for orientation {} at address 0x{:02X}…'.format(orientation.name, _thunderborg_address))
             try:
                 if self._i2c_scanner.has_address([_thunderborg_address]):
                     self._log.info('importing ThunderBorg at address 0x{:02X}…'.format(_thunderborg_address))
@@ -215,7 +215,7 @@ class MotorConfigurer():
                 _tb.Init() # set the board up (checks the board is connected)
                 self._log.info('successfully instantiated ThunderBorg.')
                 self._log.info(Fore.MAGENTA + 'successfully instantiated ThunderBorg for orientation {} at address 0x{:02X}…'.format(
-                        orientation.name, _thunderborg_address) + Style.RESET_ALL)
+                        orientation.name, _thunderborg_address))
                 if not _tb.foundChip:
                     boards = ThunderBorg.ScanForThunderBorg()
                     if len(boards) == 0:
@@ -258,7 +258,7 @@ class MotorConfigurer():
             except OSError as e:
                     raise Exception('unable to instantiate ThunderBorg [4].')
             except Exception as e:
-                    raise Exception('unable to instantiate ThunderBorg [5].')
+                    raise Exception('{} error instantiating ThunderBorg [5]: {}'.format(type(e), e))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_thunderborg_leds(self, enable):

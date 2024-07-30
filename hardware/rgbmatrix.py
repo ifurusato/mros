@@ -59,7 +59,6 @@ class RgbMatrix(object):
         self._has_stbd_rgbmatrix = False
         self._port_rgbmatrix = None
         self._stbd_rgbmatrix = None
-
         if enable_port:
             self._port_rgbmatrix = RGBMatrix5x5(address=0x77)
             self._log.info('port rgbmatrix at 0x77.')
@@ -76,7 +75,6 @@ class RgbMatrix(object):
             self._has_stbd_rgbmatrix = True
         else:
             self._log.debug('no starboard rgbmatrix found.')
-
         self._log.info('rgbmatrix width,height: {},{}'.format(5, 5))
         self._thread_PORT = None
         self._thread_STBD = None
@@ -87,6 +85,8 @@ class RgbMatrix(object):
         self._display_type = DisplayType.DARK # default
         # define percentage to column converter
         self._percent_to_column = Ranger(0, 100, 0, 9)
+        # color used by random display
+        self._random_delay_sec = 0.05 # was 0.01 in original
         # color used by wipe display
         self._wipe_color = Color.WHITE # default
         # used by _cpu:
@@ -618,6 +618,11 @@ class RgbMatrix(object):
         pass
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+    def set_random_delay_sec(self, delay_sec):
+        if delay_sec > 0.0:
+            self._random_delay_sec = delay_sec
+
     def _random(self, rgbmatrix5x5, arg):
         '''
         Display an ever-changing random pattern.
@@ -642,7 +647,7 @@ class RgbMatrix(object):
             if not enabled:
                 break
             rgbmatrix5x5.show()
-            time.sleep(0.01)
+            time.sleep(self._random_delay_sec)
         self._clear(rgbmatrix5x5)
         self._log.info('random ended.')
 

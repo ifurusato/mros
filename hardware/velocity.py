@@ -26,6 +26,9 @@ from core.orientation import Orientation
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Velocity(object):
     '''
+    NOTE: the following regards the KR01 robot and has not been updated
+    for the MR01 Mars rover.
+
     Velocity is a property of a motor, and therefore this class is meant
     to be instantiated on a motor. It is used to calculate velocity by
     capturing the step count from a motor encoder, where a specific number
@@ -136,6 +139,11 @@ class Velocity(object):
         self._enabled      = False
         self._closed       = False
         self._log.info('ready.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def reset_steps(self):
+        self._steps_begin = 0
+        self._stepcount_timestamp = time.time()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property

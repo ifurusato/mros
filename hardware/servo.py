@@ -62,7 +62,7 @@ class Servo(object):
         else:
             self._color = Fore.GREEN
         self._code = self._get_code()
-        self._log.info(Fore.CYAN + "{} servo set up on channel {}.".format(self._name, _channel) + Style.RESET_ALL)
+        self._log.info(Fore.CYAN + "{} servo set up on channel {}.".format(self._name, _channel))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def report(self):
@@ -154,7 +154,7 @@ class Servo(object):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def center(self):
         if self._enabled:
-            self._log.info(self._color + 'center {} servo position.'.format(self._name) + Style.RESET_ALL)
+            self._log.info(self._color + 'center {} servo position.'.format(self._name))
             self.angle = 0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

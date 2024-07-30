@@ -48,24 +48,23 @@ class Convert:
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
-    def difference_in_degrees(angle1, angle2):
+    def difference_in_degrees(starting_angle, target_angle):
         '''
         Returns the shortest angular difference between two angles (provided
-        in degrees). When the difference is 180° a positive angle is returned.
+        in degrees), returning the result as an int.
         '''
-#       x = math.radians(angle2)
-#       y = math.radians(angle1)
-#       return math.degrees(min(y-x, y-x+2 * math.pi, y-x-2 * math.pi, key=abs))
-        offset = ( angle1 - angle2 ) % 360.0
-        return offset - 360.0 if offset > 180.0 else offset
+        _starting_angle_rad = math.radians(starting_angle)
+        _target_angle_rad   = math.radians(target_angle)
+        return round(math.degrees(math.atan2(math.sin(_target_angle_rad - _starting_angle_rad), math.cos(_target_angle_rad - _starting_angle_rad))))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
-    def offset_in_radians(angle, offset):
+    def difference_in_radians(starting_angle, target_angle):
         '''
-        Add two angles (provided in radians), returning the result.
+        Return the shortest angular difference between two angles (provided
+        in radians), returning the result as a float.
         '''
-        return (angle + offset) % (2.0 * PI)
+        return math.atan2(math.sin(target_angle - starting_angle), math.cos(target_angle - starting_angle))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod

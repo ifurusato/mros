@@ -46,7 +46,7 @@ def key_callback(event):
 @pytest.mark.unit
 def test_motors():
 
-    _use_digital_pot = False
+    _use_digital_pot = True
 
     _pfwd_motor_enabled = True
     _sfwd_motor_enabled = True
@@ -97,22 +97,22 @@ def test_motors():
         # report on each motor's ThunderBorg:
         if _pfwd_motor_enabled:
             _i2cAddress = _pfwd_motor.tb.I2cAddress
-            _log.info(Fore.RED   + 'PFWD I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+            _log.info(Fore.RED   + 'PFWD I2C address: 0x{:02X}'.format(_i2cAddress))
         if _sfwd_motor_enabled:
             _i2cAddress = _sfwd_motor.tb.I2cAddress
-            _log.info(Fore.GREEN + 'SFWD I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+            _log.info(Fore.GREEN + 'SFWD I2C address: 0x{:02X}'.format(_i2cAddress))
         if _pmid_motor_enabled:
             _i2cAddress = _pmid_motor.tb.I2cAddress
-            _log.info(Fore.RED   + 'PMID I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+            _log.info(Fore.RED   + 'PMID I2C address: 0x{:02X}'.format(_i2cAddress))
         if _smid_motor_enabled:
             _i2cAddress = _smid_motor.tb.I2cAddress
-            _log.info(Fore.GREEN + 'SMID I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+            _log.info(Fore.GREEN + 'SMID I2C address: 0x{:02X}'.format(_i2cAddress))
         if _paft_motor_enabled:
             _i2cAddress = _paft_motor.tb.I2cAddress
-            _log.info(Fore.RED   + 'PAFT I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+            _log.info(Fore.RED   + 'PAFT I2C address: 0x{:02X}'.format(_i2cAddress))
         if _saft_motor_enabled:
             _i2cAddress = _saft_motor.tb.I2cAddress
-            _log.info(Fore.GREEN + 'SAFT I2C address: 0x{:02X}'.format(_i2cAddress) + Style.RESET_ALL)
+            _log.info(Fore.GREEN + 'SAFT I2C address: 0x{:02X}'.format(_i2cAddress))
        
         if _use_digital_pot and _i2c_scanner.has_hex_address(['0x0E']):
             _log.info('using digital potentiometer…')

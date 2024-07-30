@@ -53,7 +53,6 @@ class PIDController(Component):
         Component.__init__(self, self._log, suppressed=suppressed, enabled=enabled)
         self._counter = itertools.count() # TEMP
         # PID configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        self._speed_scale_factor = config['mros'].get('motor_controller').get('scale_factor')
         _cfg = config['mros'].get('motor').get('pid_controller')
         _kp         = _cfg.get('kp') # proportional gain
         _ki         = _cfg.get('ki') # integral gain
@@ -140,14 +139,6 @@ class PIDController(Component):
         return kp, ki, kd, cp, ci, cd, self._last_power, self._motor.current_power_level, self._power, self._motor.target_speed, self._pid.setpoint, self._motor.steps
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    @property
-    def target_speed(self):
-        '''
-        Returns the current target speed, scaled as 0.0-1.0.
-        '''
-        return self._motor.target_speed / self._speed_scale_factor
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_speed(self, target_speed):
         if self.enabled:
             if isclose(target_speed, 0.0, abs_tol=1e-2):
@@ -158,7 +149,9 @@ class PIDController(Component):
             else:
                 self._pid.setpoint = target_speed
                 # converts speed to power...
-                _pid_output = self._pid(self._motor.velocity)
+                self._pid.target = self._motor.velocity
+                _pid_output = self._pid()
+#               _pid_output = self._pid(self._motor.velocity)
                 self._power += _pid_output
                 _motor_power = self._power
                 self._last_power = self._power
@@ -171,8 +164,8 @@ class PIDController(Component):
                     _elapsed_ms = round(( dt.now() - self._last_time ).total_seconds() * 1000.0)
                     _count = next(self._counter)
                     if _count % 20 == 0:
-                        self._log.info(Fore.YELLOW + 'target speed: {:5.2f}; current speed: {:5.2f};'.format(target_speed / self._speed_scale_factor, self._motor.speed)
-#                               + Fore.GREEN + Style.NORMAL + ' pid.setpoint: {:5.2f}; pid output: {:5.2f};'.format(self._pid.setpoint, _pid_output)
+                        self._log.info(Fore.YELLOW + 'target speed: {:5.2f}; current speed: {:5.2f};'.format(target_speed, self._motor.target_speed)
+                                + Fore.GREEN + Style.NORMAL + ' pid.setpoint: {:5.2f}; pid output: {:5.2f};'.format(self._pid.setpoint, _pid_output)
 #                               + Fore.MAGENTA + ' kp: {:7.4f}; ki: {:7.4f}; kd: {:7.4f})'.format(self._pid.kp, self._pid.ki, self._pid.kd)
                                 + Fore.WHITE + ' motor power: {:<5.2f};'.format(_motor_power)
                                 + Fore.CYAN + Style.NORMAL + ' elapsed: {:d}ms'.format(_elapsed_ms))

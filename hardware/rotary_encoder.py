@@ -37,6 +37,8 @@ class RotaryEncoder(object):
         self._log = Logger("rot-enc", level)
 
         self._ioe = io.IOE(i2c_addr=RotaryEncoder.I2C_ADDR, interrupt_pin=4)
+        self._ioe.enable_interrupt_out(pin_swap=True)
+        self._callback = None
 
         self._encoder = Encoder(self._ioe, RotaryEncoder.CHANNEL, RotaryEncoder.PINS, common_pin=RotaryEncoder.POT_ENC_C)
         # configure for RGB LED display
@@ -47,6 +49,13 @@ class RotaryEncoder(object):
         self._ioe.set_mode(RotaryEncoder.PIN_BLUE, io.PWM, invert=True)
         self._log.info("ready: rotary encoder running LED with {} brightness steps.".format(
                 int(RotaryEncoder.PERIOD * RotaryEncoder.BRIGHTNESS)))
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_callback(self, callback):
+        '''
+        Sets the callback to be executed upon an interrupt.
+        '''
+        self._ioe.on_interrupt(callback)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def delta(self):
@@ -72,9 +81,8 @@ class RotaryEncoder(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def close(self):
-        self._ioe.clear_interrupt()
         self.set_color(0,0,0)
-
+        self._ioe.clear_interrupt()
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 class Selector(object):
@@ -85,9 +93,12 @@ class Selector(object):
     '''
 
     def __init__(self, limit, level=Level.INFO):
-        self._limit  = limit
+        self._limit = limit
         self._value = 0
         self._last_value = 0
+
+    def set_limit(self, limit):
+        self._limit = limit - 1
 
     def get_value(self, value):
         if value > self._last_value: # count up

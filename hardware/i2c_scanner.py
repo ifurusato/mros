@@ -34,7 +34,7 @@ class I2CScanner(object):
     '''
     Scans the I²C bus, returning a list of devices.
     '''
-    def __init__(self, config, level):
+    def __init__(self, config, bus_number=1, level=Level.INFO):
         super().__init__()
         self._log = Logger('i2cscan', level)
         self._config = config
@@ -44,8 +44,8 @@ class I2CScanner(object):
         try:
             self._log.info('initialising…')
             from smbus2 import SMBus
-            bus_number = 1  # 1 indicates /dev/i2c-1
-            self._bus = SMBus(bus_number)
+            _bus_number = bus_number  # 1 indicates /dev/i2c-1
+            self._bus = SMBus(_bus_number)
             self._log.info('ready.')
         except ImportError:
             self._log.warning('import error, unable to initialise: this script requires smbus2. Scan will return an empty result.')

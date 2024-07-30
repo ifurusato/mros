@@ -54,10 +54,10 @@ try:
         _tb2.i2cAddress = 0x15
         _tb2.Init()
 
-    # thunderborg 1 ...............................
+    # thunderborg 1 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     if _tb1:
         _tb1.SetLedShowBattery(False)
-    
+
         if LED_TEST_TB1:
             _log.info('ThunderBorg 1 LED Test…')
             for _ in range(7):
@@ -68,19 +68,19 @@ try:
             _tb1.SetLeds(1.0, 0.0, 0.0) # -> starboard ThunderBorg LED red
             time.sleep(3)
             _tb1.SetLeds(0.0, 0.0, 0.0) # black
-    
+
         if MOTOR_TEST_TB1:
             _log.info(Fore.RED + 'ThunderBorg 1 Motor 1 Test…' + Style.RESET_ALL)
             _tb1.SetMotor1(MOTOR_POWER) # fore port
             time.sleep(DELAY_SEC)
             _tb1.SetMotor1(0.0)
-    
+
             _log.info(Fore.GREEN + 'ThunderBorg 1 Motor 2 Test…' + Style.RESET_ALL)
             _tb1.SetMotor2(MOTOR_POWER) # fore starboard
             time.sleep(DELAY_SEC)
             _tb1.SetMotor2(0.0)
 
-    # thunderborg 2 ...............................
+    # thunderborg 2 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     if _tb2:
         _tb2.SetLedShowBattery(False)
 
@@ -94,13 +94,13 @@ try:
             _tb2.SetLeds(1.0, 0.0, 0.0) # -> starboard ThunderBorg LED red
             time.sleep(3)
             _tb2.SetLeds(0.0, 0.0, 0.0) # black
-    
+
         if MOTOR_TEST_TB2:
             _log.info(Fore.RED + 'ThunderBorg 2 Motor 1 (PORT) Test…' + Style.RESET_ALL)
             _tb2.SetMotor1(MOTOR_POWER)
             time.sleep(DELAY_SEC)
             _tb2.SetMotor1(0.0)
-    
+
             _log.info(Fore.GREEN + 'ThunderBorg 2 Motor 2 (STBD) Test…' + Style.RESET_ALL)
             _tb2.SetMotor2(MOTOR_POWER)
             time.sleep(DELAY_SEC)

@@ -34,9 +34,9 @@ if setting == 'on' or setting == 'off':
     _screen = Screen(_config, Level.INFO)
   
     if setting == 'on':
-        _screen.on()
+        _screen.enable()
     else:
-        _screen.off()
+        _screen.disable()
 
 else:
     print(Fore.RED + "ERROR: expected 'on' or 'off'." + Style.RESET_ALL)

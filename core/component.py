@@ -7,7 +7,7 @@
 #
 # author:   Murray Altheim
 # created:  2021-06-29
-# modified: 2021-10-16
+# modified: 2024-07-13
 #
 # MissingComponentError at bottom
 #
@@ -40,6 +40,10 @@ class Component(object):
 
     The Component is suppressed and disabled by default, though via optional
     constructor arguments either can set be set to True.
+
+    All Components are automatically added to the ComponentRegistry, which is
+    an alternative means of gaining access to them within the application, by
+    name.
 
     :param logger:  the Logger used for the Component
     '''
@@ -191,6 +195,13 @@ class ComponentRegistry(object):
             self._log.info('added component \'{}\' to registry ({:d} total).'.format(name, len(self._dict)))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get(self, name):
+        '''
+        Return the component by name.
+        '''
+        return self._dict.get(name)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def print_registry(self):
         '''
         Print the registry to the log.
@@ -199,7 +210,7 @@ class ComponentRegistry(object):
         with _mutex:
             self._log.info('component list:')
             for _name, _component in self._dict.items():
-                self._log.info('  {} {}'.format(_name, Util.repeat(' ', 16 - len(_name))) + Style.DIM + '{}'.format(_component.classname))
+                self._log.info('  {} {}'.format(_name, Util.repeat(' ', 16 - len(_name))) + Fore.YELLOW + '{}'.format(_component.classname))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_registry(self):

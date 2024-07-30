@@ -112,14 +112,14 @@ class SystemSubscriber(Subscriber):
             else:
                 self._log.critical('WARNING! WARNING! WARNING! high temperature encountered! Time to go into idle mode.')
          
-        elif payload.event is Event.COLLISION_DETECT:
-            self._log.critical('collision detection!')
+        elif payload.event is Event.OVER_CURRENT:
+            self._log.critical('over current!')
             if self._exit_on_dire_event:
 #               self._message_bus.disable()
 #               self._mros.disable()
                 pass # TODO
             else:
-                self._log.critical('WARNING! WARNING! WARNING! collision detection! Stop everything now.')
+                self._log.critical('WARNING! WARNING! WARNING! over current! Stop everything now.')
             pass
         else:
 #           raise ValueError('unrecognised system event: {}'.format(payload.event.name))

@@ -14,13 +14,17 @@ mros:
     arguments:                                             # CLI arguments are copied here
         nada:                             False            # nada
     use_external_clock:                    True            # if True use external clock, ignoring loop delay value
+    use_slow_external_clock:               True            # if True use the slow (5Hz) external clock
+    enable_monitor:                        True            # if True use OLED display as monitor
     component:
         # publishers .......................................
         enable_queue_publisher:           False            # publishes from globally-available queue
+        enable_system_publisher:           True            # enable System Publisher
         enable_clock_publisher:           False            # enable Clock Publisher
         enable_sensor_array_publisher:     True            # enable SensorArray publisher
         enable_remote_ctrl_publisher:      True            # enable Remote Control Publisher
         enable_rtof_publisher:            False            # enable Ranging ToF publisher
+        enable_imu_publisher:              True            # enable IMU publisher
         # subscribers ......................................
         enable_remote_ctrl_subscriber:     True            # handle remote control messages
         enable_system_subscriber:          True            # system events subscriber
@@ -53,6 +57,8 @@ mros:
             i2c_address:                   0x18            # I2C address of the IO Expander
             source:                        'ioe'           # either 'gpio' or 'ioe'
             pin:                             13            # the GPIO or IO Expander pin used
+        ina260:
+            i2c_address:                   0x41            # I2C address (default 0x40)
         bno055:
             i2c_device:                       1            # I2C device bus number, equivalent to '/dev/i2c-1'
             mode:                        'NDOF_MODE'       # Acc/Mag/Gyr (see table in BNO055Mode class)
@@ -66,10 +72,15 @@ mros:
         icm20948:
             i2c_address:                   0x69            # I2C address (default 0x68)
             poll_rate_hz:                    50            # how often the IMU is polled
-            show_console:                  True            # if true, show data on console
+            bench_calibrate:              False            # if true, calibrate the IMU while on the rotating bench
+            motion_calibrate:             False            # if true, calibrate the IMU by rotating the robot in place
+            show_console:                 False            # if true, show data on console (same as verbose)
+            show_rgbmatrix5x5:             True            # if true, show heading as color
             show_rgbmatrix11x7:            True            # if true, show heading as number
             adjust_trim:                  False            # if true, use pot for trim, otherwise used fixed value
-            trim:                          0.15            # heading trim adjustment to set north
+            pitch_trim:                    0.0             # pitch trim for level
+            roll_trim:                     4.0             # roll trim for level
+            heading_trim:                  0.15            # heading trim adjustment to set north
             queue_length:                   100            # length of heading data queue
             stability_threshold:              5.0          # max standard deviation to determine stability
             cardinal_tolerance:       0.0698132            # tolerance to cardinal points (in radians)
@@ -77,6 +88,13 @@ mros:
             play_sound:                    True            # if True, play sound to indicate calibration
         irq_clock:
             pin:                             18            # GPIO pin connected to an external clock source
+            slow_pin:                        23            # GPIO pin connected to a slow (5Hz) external clock source
+            freq_divider:                    50            # tick divisor for lower frequency callback
+        monitor:
+            permit_callback:               False           # setting True may introduce message timing issues
+            font_size:                       10            # main font size
+            font_size_full:                   8            # font size for bar
+            font_name:      'Varela-Regular.ttf'           # font family
         gamepad:
             enabled:                       True
             device_path:     '/dev/input/event9'           # the path to the bluetooth gamepad on the pi (see find_gamepad.py)
@@ -87,20 +105,22 @@ mros:
             enabled:                       True
     motion_controller:
         afrs_max_ratio:                       0.36016      # speed ratio of inner wheels at max turn 
-        afrs_max_angle:                           45.0          # maximum AFRS turn angle
+        afrs_max_angle:                      45.0          # maximum AFRS turn angle
+        default_manual_speed:                 0.39         # default speed used when potentiometer is unavailable (one third ahead)
+        play_sound:                        True            # if True, play sound to indicate calibration
     stop_handler:                                          # offloads stop handling for motor controller
         stop_ratio:                           0.25         # multiplier for stopping lambda
         halt_ratio:                           0.85         # multiplier for halting lambda
         brake_ratio:                          0.93         # multiplier for braking lambda
     motor_controller:
         loop_freq_hz:                    20                # main loop delay in hz
+        verbose:                          False            # noisy messaging
         halt_rate:                    'SLOWEST'            # slew rate for quick halt behaviour
         brake_rate:                   'SLOWEST'            # slew rate for slower braking behaviour
         max_speed:                          100.0          # maximum motor speed (0.0-1.0)
-        scale_factor:                         5.0          # somewhat of a fudge factor that determines the maximum power sent to the motors (7 maxes them out at 0.9)
-#       spin_speed:                 'TWO_THIRDS'           # motor speed when spinning
+        rotation_speed:                       0.25         # motor speed when rotating in place
+#       spin_speed:                 'TWO_THIRDS'           # motor speed when spinning (KROS)
 #       use_speed_indicator:              False            # publish RGB events for motor speed indication
-        verbose:                           True            # noisy messaging
     servo_controller:
         rotate_angle:                        59.5          # angle used for rotate mode
         spin_angle:                          90.0          # angle used for spin mode
@@ -143,12 +163,11 @@ mros:
         wheel_offset:                        58            # offset from wheel centerline to steering axle
         steps_per_rotation:                2774.64         # encoder steps per wheel rotation
     motor:
-        speed_limit:                        5.0            # limit to settable motor speed
         motor_voltage:                       12            # the voltage rating of the motor
         motor_power_limit:                 0.90            # upper and lower (x -1) limit set on power sent to motor
+        scale_factor:                         5.0          # a constant multiplier that determines maximum power sent to the motors (7 maxes them out at 0.9)
         enable_pid_controller:             True            # initial enable state for PID controller, otherwise direct drive
         enable_slew_limiter:               True            # initial enabled state for slew limiter (if disabled, no halt or brake)
-        slew_rate:                     'SLOWEST'           # slew rate for general motor changes: SLOWEST, SLOWER, SLOW, NORMAL, FAST, FASTER, FASTEST
         enable_jerk_limiter:              False            # initial enabled state for jerk limiter
         thunderborg_fore_address:          0x15            # I²C address for fore thunderborg motor controller
         thunderborg_mid_address:           0x00            # I²C address for mid thunderborg motor controller
@@ -174,8 +193,8 @@ mros:
             reverse_encoder_saft:         False            # ditto
             reverse_encoder_paft:          True            # ditto
         pid_controller:
-            kp:                               0.04400      # proportional gain (was 0.0950)
-            ki:                               0.01300      # integral gain
+            kp:                               0.05000      # proportional gain
+            ki:                               0.00500      # integral gain
             kd:                               0.00000      # derivative gain
             minimum_output:                 -10.0          # lower output limit
             maximum_output:                  10.0          # upper output limit
@@ -228,11 +247,19 @@ mros:
 #               FULL:                        80.0
 #               MAXIMUM:                     90.0
     publisher:
+        system:
+            publish_delay_sec:               10.0          # publishing delay loop
+            current_threshold:                6.0          # alarm over current
+            voltage_threshold:               16.0          # alarm under voltage
         remote:
             loop_freq_hz:                    20            # polling loop frequency (Hz)
             d0_pin:                          22            # GPIO pin for bit 0
             d1_pin:                          27            # GPIO pin for bit 1
             d2_pin:                          17            # GPIO pin for bit 2
+        imu:
+            loop_freq_hz:                     5            # polling loop frequency (Hz)
+            pitch_threshold:                 20.0          # pitch threshold for sending a message
+            roll_threshold:                  20.0          # roll threshold for sending a message
         clock:
             divider:                         60            # divider for IRQ ticks (@20Hz, 60 = 3s)
         queue:
@@ -305,13 +332,14 @@ pi:
 
 # device registry ..............................................................
 devices:
-    0x0E: 'RGB Potentiometer'
-    0x0F: 'RGB Encoder' # default, moved to 0x16
+    0x0C: 'Digital Potentiometer'
+    0x0E: 'Digital Potentiometer: Panel'
+    0x0F: 'Digital Encoder' # default, moved to 0x16
     0x10: 'PA1010D GPS'
-    0x15: 'ThunderBorg - Fwd'
-    0x16: 'ThunderBorg - Aft'
-    0x18: 'IO Expander - Aft'
-    0x19: 'IO Expander - Fwd'
+    0x15: 'ThunderBorg: Fwd'
+    0x16: 'ThunderBorg: Aft'
+    0x18: 'IO Expander: Aft'
+    0x19: 'IO Expander: Fwd'
     0x22: 'Picon Zero 1'
     0x23: 'Picon Zero 2'
     0x28: 'BNO055'

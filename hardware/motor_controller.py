@@ -20,6 +20,7 @@ from colorama import init, Fore, Style
 init()
 
 from core.rate import Rate
+from core.rotation import Rotation
 from core.component import Component
 from core.direction import Direction
 from core.orientation import Orientation
@@ -30,6 +31,12 @@ from hardware.slew_rate import SlewRate
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class MotorController(Component):
+    STOP_LAMBDA_NAME  = "__stop_accum" # TEMP moved to StopHandler
+    PORT_CW_STEERING_LAMBDA_NAME   = "__port_rotate_cw_steering"
+    STBD_CW_STEERING_LAMBDA_NAME   = "__stbd_rotate_cw_steering"
+    PORT_CCW_STEERING_LAMBDA_NAME  = "__port_rotate_ccw_steering"
+    STBD_CCW_STEERING_LAMBDA_NAME  = "__stbd_rotate_ccw_steering"
+
     '''
     The controller for 4-6 motors:
 
@@ -65,7 +72,7 @@ class MotorController(Component):
         if config is None:
             raise ValueError('no configuration provided.')
         _cfg = config['mros'].get('motor_controller')
-        _i2c_scanner = I2CScanner(config, level)
+        _i2c_scanner = I2CScanner(config, bus_number=1, level=level)
         self._external_clock = external_clock
         # config ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._verbose        = _cfg.get('verbose')
@@ -91,10 +98,18 @@ class MotorController(Component):
         self._loop_enabled   = False
         self._event_counter  = itertools.count()
         # speed and changes to speed ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        self.__callback      = None
+        self._is_stopped     = True # used to capture state transitions
+        self.__state_change_callbacks = [] # anyone who wants to be informed if the robot is moving or stopped
+        self._rotation_speed_multiplier = 1.0
+        # lambdas to alter direction to comply with rotation
+        self._port_cw_rotate_lambda = lambda speed: speed * self._rotation_speed_multiplier
+        self._stbd_cw_rotate_lambda = lambda speed: -1.0 * speed * self._rotation_speed_multiplier
+        self._port_ccw_rotate_lambda = lambda speed: -1.0 * speed * self._rotation_speed_multiplier
+        self._stbd_ccw_rotate_lambda = lambda speed: speed * self._rotation_speed_multiplier
         self._theta          = 0.0
         self._stbd_speed     = 0.0
         self._port_speed     = 0.0
-        self._speed_scale_factor = _cfg.get('scale_factor') # effectively sets max power to motors
         _max_speed           = _cfg.get('max_speed') # max speed of motors (0-100)
         _min_speed           = -1 * _max_speed
         self._log.info('motor speed clamped at {} to {}.'.format(_min_speed, _max_speed))
@@ -114,8 +129,8 @@ class MotorController(Component):
         if orientation is Orientation.CNTR:
             for _motor in self._get_motors():
                 self._log.info('AVERAGING with speed of {} motor speed: modified={:.2f}; speed={:.2f}; target={:.2f}'.format(_motor.orientation.name,
-                        _motor.modified_speed, _motor.speed, _motor.target_speed))
-                _speeds.append(_motor.speed)
+                        _motor.modified_speed, _motor.target_speed, _motor.target_speed))
+                _speeds.append(_motor.target_speed)
 #               _speeds.append(_motor.modified_speed)
 
         elif orientation is Orientation.PORT:
@@ -247,14 +262,15 @@ class MotorController(Component):
         self._log.info(Style.BRIGHT + 'loop start.')
         try:
             while f_is_enabled():
+                # execute any callback here…
                 for _motor in self._all_motors:
-                    self._log.info(Fore.GREEN + 'updating {} motor…'.format(_motor.orientation.name))
+#                   self._log.info('updating {} motor…'.format(_motor.orientation.name))
                     _motor.update_target_speed()
-                # add execute any callbacks here…
                 if self._verbose: # print stats
                     _count = next(self._event_counter)
                     if _count % 20 == 0:
                         self.print_info(_count)
+                self._state_change_check()
                 self._rate.wait()
         except Exception as e:
             self._log.error('error in loop: {}\n{}'.format(e, traceback.format_exc()))
@@ -268,6 +284,9 @@ class MotorController(Component):
         asyncio _loop() method.
         '''
         if self.enabled:
+            # execute any callback here…
+            if self.__callback is not None:
+                self.__callback()
             for _motor in self._all_motors:
                 if _motor.enabled:
                     _motor.update_target_speed()
@@ -275,8 +294,29 @@ class MotorController(Component):
                 _count = next(self._event_counter)
                 if _count % 10 == 0:
                     self.print_info(_count)
+            self._state_change_check()
         else:
-            self._log.warning('not enabled: external callback ignored.')
+#           self._log.warning('not enabled: external callback ignored.')
+            pass
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def add_state_change_callback(self, callback):
+        '''
+        Add the callback to the list, for changes to stop/moving state.
+        '''
+        self.__state_change_callbacks.append(callback)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _state_change_check(self):
+        '''
+        Check if the stopped/moving state has changed since the last call.
+        '''
+        _currently_is_stopped = self.is_stopped
+        if _currently_is_stopped != self._is_stopped:
+            self._log.info(Fore.WHITE + 'changed state: stopped? {}'.format(_currently_is_stopped))
+            for _callback in self.__state_change_callbacks:
+                _callback()
+        self._is_stopped = _currently_is_stopped
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def is_stopping(self):
@@ -298,28 +338,18 @@ class MotorController(Component):
                 _motor.remove_speed_multiplier(MotorController.BRAKE_LAMBDA_NAME)
         self._reset_slew_rate()
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+  # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
     def is_stopped(self):
         '''
-        Returns true if the speed of all motors is zero.
-        '''
-        _not_in_motion = not self.is_in_motion
-#       if self.is_stopping() and _not_in_motion:
-#           self.reset_stopping()
-        return _not_in_motion
-
-  # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    @property
-    def is_in_motion(self):
-        '''
-        Returns true if any of the motors are moving, i.e., if the motor
-        power of any motor is greater than zero.
+        Returns True if the speed of all motors is zero, False if any are
+        moving, i.e., if the motor power of any motor is greater than zero.
         '''
         for _motor in self._all_motors:
-            if _motor.is_in_motion:
-                return True
-        return False
+#           if _motor.is_in_motion:
+            if not _motor.is_stopped:
+                return False
+        return True
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_speed(self, orientation, value):
@@ -327,42 +357,33 @@ class MotorController(Component):
         Sets the speed of all motors associated with the port or
         starboard orientation.
         '''
-        _color = None
-        _port_style = Style.NORMAL
-        _stbd_style = Style.NORMAL
         if orientation is Orientation.PORT:
-            _color = Fore.RED
-            _port_style = Style.BRIGHT
             self._port_speed = self._clamp(value)
             self.set_motor_speed(Orientation.PFWD, self._port_speed)
 #           self.set_motor_speed(Orientation.PMID, self._port_speed)
             self.set_motor_speed(Orientation.PAFT, self._port_speed)
         elif orientation is Orientation.STBD:
-            _color = Fore.GREEN
-            _stbd_style = Style.BRIGHT
             self._stbd_speed = self._clamp(value)
             self.set_motor_speed(Orientation.SFWD, self._stbd_speed)
 #           self.set_motor_speed(Orientation.SMID, self._stbd_speed)
             self.set_motor_speed(Orientation.SAFT, self._stbd_speed)
-
         else:
             raise Exception('unsupported orientation {}'.format(orientation.name))
-#       self._theta = ( self._port_speed / 100.0 ) - ( self._stbd_speed / 100.0 )
-#       _display_theta = int( 100.0 * self._theta )
-#       self._log.info(_color + "add value {:.2f}; speed: ".format(value)
-#               + _port_style + " port={:.2f}".format(self._port_speed)
-#               + _stbd_style + " stbd={:.2f}".format(self._stbd_speed))
-#               + Fore.WHITE + Style.BRIGHT + ' theta: {:d}'.format(_display_theta))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_motor_speed(self, orientation, target_speed):
         '''
         A convenience method that sets the target speed and motor power of
         the specified motor, as identified by Orientation. Accepts either
-        ints or floats between -100 and 100.
+        ints or floats between -1.0 and 1.0.
+
+        This precedes setting the target speed by reseting the Velocity
+        step count, otherwise it would be polluted by previous data.
 
         When the motor controller is disabled any calls to this method will
         override the target speed argument and set it to zero.
+
+        The values are scaled on the motor side, not here.
         '''
         if not self.enabled:
             self._log.error('motor controller not enabled.')
@@ -371,29 +392,73 @@ class MotorController(Component):
             raise ValueError('expected target speed as float not int: {:d}'.format(target_speed))
         if not isinstance(target_speed, float):
             raise ValueError('expected float, not {}'.format(type(target_speed)))
-        _argument = target_speed
-        target_speed *= self._speed_scale_factor
-#       self._log.info('set {} argument: {:5.2f}; motor speed: {:5.2f}'.format(orientation.name, _argument, target_speed))
+#       self._log.info('set {} motor speed: {:5.2f}'.format(orientation.name, target_speed))
         if orientation is Orientation.PFWD and self._pfwd_motor.enabled:
             self._pfwd_motor.target_speed = target_speed
-#           self._log.info('set PFWD motor speed ' + Fore.RED   + 'PORT: {:5.2f}'.format(target_speed))
-        if orientation is Orientation.SFWD and self._sfwd_motor.enabled:
+        elif orientation is Orientation.SFWD and self._sfwd_motor.enabled:
             self._sfwd_motor.target_speed = target_speed
-#           self._log.info('set SFWD motor speed ' + Fore.GREEN + 'STBD: {:5.2f}'.format(target_speed))
 #       if orientation is Orientation.PMID:
 #           self._pmid_motor.target_speed = target_speed
-#           self._log.info('set PMID motor speed ' + Fore.RED   + 'PORT: {:5.2f}'.format(target_speed))
 #       if orientation is Orientation.SMID:
 #           self._smid_motor.target_speed = target_speed
-#           self._log.info('set SMID motor speed ' + Fore.GREEN + 'STBD: {:5.2f}'.format(target_speed))
-        if orientation is Orientation.PAFT and self._paft_motor.enabled:
+        elif orientation is Orientation.PAFT and self._paft_motor.enabled:
             self._paft_motor.target_speed = target_speed
-#           self._log.info('set PAFT motor speed ' + Fore.RED   + 'PORT: {:5.2f}'.format(target_speed))
-        if orientation is Orientation.SAFT and self._saft_motor.enabled:
+        elif orientation is Orientation.SAFT and self._saft_motor.enabled:
             self._saft_motor.target_speed = target_speed
-#           self._log.info('set SAFT motor speed ' + Fore.GREEN + 'STBD: {:5.2f}'.format(target_speed))
-#       else:
+        else:
+            self._log.warning('expected a motor orientation, not {}'.format(orientation))
 #           raise TypeError('expected a motor orientation, not {}'.format(orientation))
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def rotation_speed_multiplier(self):
+        return self._rotation_speed_multiplier
+
+    @rotation_speed_multiplier.setter
+    def rotation_speed_multiplier(self, rotation_speed_multiplier):
+        self._rotation_speed_multiplier = rotation_speed_multiplier
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def rotate(self, rotation):
+        '''
+        This sets the rotation callback to set the motors for rotation
+        in the prescribed direction. This adds a lambda to the motors
+        to alter their rotation to comply with the rotation direction.
+        '''
+        if rotation is None:
+            raise ValueError('rotation argument not provided.')
+        self._log.info('🍐 rotate {}; current rotation speed multiplier: {:5.2f}'.format(rotation, self._rotation_speed_multiplier))
+        self._rotation = rotation # TODO is this necessary as a class variable?
+#       self.__callback = None
+        if self._rotation is Rotation.STOPPED:
+            self._log.info('🍐 no rotation.')
+            for _motor in self._all_motors:
+                _motor.clear_speed_multipliers()
+            self.set_motor_speed(Orientation.PFWD, 0.0)
+            self.set_motor_speed(Orientation.SFWD, 0.0) 
+#           self.set_motor_speed(Orientation.PMID, 0.0)
+#           self.set_motor_speed(Orientation.SMID, 0.0)
+            self.set_motor_speed(Orientation.PAFT, 0.0)
+            self.set_motor_speed(Orientation.SAFT, 0.0)
+            return
+        elif self._rotation is Rotation.CLOCKWISE:
+            self._log.info('🍐 rotate clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+            self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CW_STEERING_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
+#           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CW_STEERING_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
+            self._paft_motor.add_speed_multiplier(MotorController.PORT_CW_STEERING_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
+            self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CW_STEERING_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+#           self._smid_motor.add_speed_multiplier(MotorController.STBD_CW_STEERING_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+            self._saft_motor.add_speed_multiplier(MotorController.STBD_CW_STEERING_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+        elif self._rotation is Rotation.COUNTER_CLOCKWISE:
+            self._log.info('🍐 rotate counter-clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+            self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CCW_STEERING_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
+#           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CCW_STEERING_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
+            self._paft_motor.add_speed_multiplier(MotorController.PORT_CCW_STEERING_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
+            self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CCW_STEERING_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+#           self._smid_motor.add_speed_multiplier(MotorController.STBD_CCW_STEERING_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+            self._saft_motor.add_speed_multiplier(MotorController.STBD_CCW_STEERING_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+        else:
+            raise Exception('expected clockwise or counter-clockwise argument.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def clamp(self, value):
@@ -491,7 +556,8 @@ class MotorController(Component):
         This is a lambda function that will slow the motors to zero speed
         very quickly. This additionally directly calls stop() on all motors.
         '''
-        target_speed = target_speed * self._stop_ratio
+        _stop_ratio = 0.25
+        target_speed = target_speed * _stop_ratio
         if self.all_motors_are_stopped:
             self._log.info('full stop now…')
             for _motor in self._all_motors:
@@ -592,24 +658,24 @@ class MotorController(Component):
                     + 'speed: '
                     # fwd ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                     + Fore.RED   + 'pfwd: {:<4.2f} / {:<4.2f}'.format(
-                            self._pfwd_motor.speed, self._pfwd_motor.modified_speed)
+                            self._pfwd_motor.target_speed, self._pfwd_motor.modified_speed)
                     + Fore.CYAN  + ' :: '
                     + Fore.GREEN + 'sfwd: {:<4.2f} / {:<4.2f}'.format(
-                            self._sfwd_motor.speed, self._sfwd_motor.modified_speed)
+                            self._sfwd_motor.target_speed, self._sfwd_motor.modified_speed)
 #                   # mid ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 #                   + Fore.RED   + 'pmid: {:<4.2f} / {:<4.2f}'.format(
-#                           self._pmid_motor.speed, self._pmid_motor.modified_speed)
+#                           self._pmid_motor.target_speed, self._pmid_motor.modified_speed)
 #                   + Fore.CYAN  + ' :: '
 #                   + Fore.GREEN + 'smid: {:<4.2f} / {:<4.2f}'.format(
-#                           self._smid_motor.speed, self._smid_motor.modified_speed)
+#                           self._smid_motor.target_speed, self._smid_motor.modified_speed)
 #                   + Fore.CYAN + ' :: movement: {}'.format(self._characterise_movement())
                     # aft ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                     + ' :: '
                     + Fore.RED   + 'paft: {:<4.2f} / {:<4.2f}'.format(
-                            self._paft_motor.speed, self._paft_motor.modified_speed)
+                            self._paft_motor.target_speed, self._paft_motor.modified_speed)
                     + Fore.CYAN  + ' :: '
                     + Fore.GREEN + 'saft: {:<4.2f} / {:<4.2f}'.format(
-                            self._saft_motor.speed, self._saft_motor.modified_speed)
+                            self._saft_motor.target_speed, self._saft_motor.modified_speed)
                     + Fore.CYAN + ' :: movement: {}'.format(self._characterise_movement()))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -653,6 +719,5 @@ class MotorController(Component):
                 return 'turn astern to port'
             else:
                 return 'astern indeterminate (2)'
-
 
 #EOF

@@ -42,12 +42,12 @@ try:
     _tb2.i2cAddress = 0x15
     _tb2.Init()
 
-    # thunderborg 1 ...............................
+    # thunderborg 1 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     if _tb1:
         _tb1.SetLedShowBattery(False)
         _tb1.SetLeds(0.0, 0.0, 0.0) # black
-    
-    # thunderborg 2 ...............................
+
+    # thunderborg 2 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     if _tb2:
         _tb2.SetLedShowBattery(False)
         _tb2.SetLeds(0.0, 0.0, 0.0) # black

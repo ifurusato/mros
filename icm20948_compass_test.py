@@ -19,7 +19,7 @@ from core.logger import Logger, Level
 from core.orientation import Orientation
 from core.config_loader import ConfigLoader
 from hardware.rgbmatrix import RgbMatrix
-from hardware.icm20948_compass import Icm20948
+from hardware.icm20948 import Icm20948
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 @pytest.mark.unit
@@ -37,9 +37,10 @@ def test_compass():
         _enable_stbd = False
         _rgbmatrix = RgbMatrix(_enable_port, _enable_stbd, _level)
         _port_rgbmatrix = _rgbmatrix.get_rgbmatrix(Orientation.PORT)
-        _compass = Icm20948(_config, _port_rgbmatrix, _level)
-        _compass.calibrate()
-        _compass.scan()
+        _icm20948 = Icm20948(_config, _port_rgbmatrix, _level)
+        if not _icm20948.is_calibrated:
+            _icm20948.calibrate()
+        _icm20948.scan()
 
     except KeyboardInterrupt:
         _log.info('Ctrl-C caught; exiting…')

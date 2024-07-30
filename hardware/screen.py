@@ -21,37 +21,39 @@ except Exception:
 from colorama import init, Fore, Style
 init()
 
+from core.component import Component
 from core.logger import Logger, Level
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-class Screen(object):
+class Screen(Component):
 
     def __init__(self, config, level=Level.INFO):
-        super().__init__()
+#       super().__init__()
         self._log = Logger('screen', level)
+        Component.__init__(self, self._log, suppressed=False, enabled=True)
         if config is None:
             raise ValueError('no configuration provided.')
         _cfg = config['mros'].get('hardware').get('screen')
         self._pin = _cfg.get('pin')
-        self._log.info(Fore.WHITE + "configuring screen control on pin {}…".format(self._pin) + Style.RESET_ALL)
+        self._log.info(Fore.WHITE + "configuring screen control on pin {}…".format(self._pin))
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self._pin, GPIO.OUT)
         if _cfg.get('enabled'):
-            self.on()
+            self.enable()
         else:
             self.off()
         self._log.info("ready.")
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def on(self):
+    def enable(self):
         self._log.info("enabling screen on channel {}…".format(self._pin))
         GPIO.setmode(GPIO.BCM)
         GPIO.output(self._pin, GPIO.HIGH)
         self._log.info("enabled.")
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def off(self):
+    def disable(self):
         self._log.info("disabling screen on channel {}…".format(self._pin))
         GPIO.setmode(GPIO.BCM)
         GPIO.output(self._pin, GPIO.LOW)
@@ -59,7 +61,7 @@ class Screen(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def close(self):
-        GPIO.cleanup(self._pin)
+#       GPIO.cleanup(self._pin)
         self._log.info("closed.")
 
 #EOF

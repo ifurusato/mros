@@ -24,14 +24,15 @@ class Group(Enum):
     STOP       = (  4, "stop" )
     BUMPER     = (  5, "bumper" )
     INFRARED   = (  6, "infrared" )
-    VELOCITY   = (  7, "velocity" )
-    THETA      = (  8, "theta" )
-    CHADBURN   = (  9, "chadburn" )
-    BEHAVIOUR  = ( 10, "behaviour" )
-    CLOCK      = ( 11, "clock" )
-    EXPERIMENT = ( 12, "experiment" )
-    REMOTE     = ( 13, "remote" )
-    OTHER      = ( 14, "other" )
+    IMU        = (  7, "imu" )
+    VELOCITY   = (  8, "velocity" )
+    THETA      = (  9, "theta" )
+    CHADBURN   = ( 10, "chadburn" )
+    BEHAVIOUR  = ( 11, "behaviour" )
+    CLOCK      = ( 12, "clock" )
+    EXPERIMENT = ( 13, "experiment" )
+    REMOTE     = ( 14, "remote" )
+    OTHER      = ( 15, "other" )
 
     def __new__(cls, *args, **kwds):
         obj = object.__new__(cls)
@@ -72,7 +73,7 @@ class Event(Enum):
     SHUTDOWN               = ( 10, "shutdown",                  1,   Group.SYSTEM )
     BATTERY_LOW            = ( 11, "battery low",               1,   Group.SYSTEM )
     HIGH_TEMPERATURE       = ( 12, "high temperature",          1,   Group.SYSTEM )
-    COLLISION_DETECT       = ( 13, "collision detect",          2,   Group.SYSTEM )
+    OVER_CURRENT           = ( 13, "over current",              1,   Group.SYSTEM )
 
     # lambda events ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     MACRO                  = ( 20, "macro script",              5,   Group.MACRO ) # with script ID as value
@@ -109,12 +110,12 @@ class Event(Enum):
     R3_HORIZONTAL          = ( 51, "r3-horz",                  10,   Group.GAMEPAD)
 
     # stopping and halting ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    STOP                   = ( 60, "stop",                     12,   Group.STOP )
-    HALT                   = ( 61, "halt",                     13,   Group.STOP )
-    BRAKE                  = ( 62, "brake",                    14,   Group.STOP )
-    STANDBY                = ( 63, "standby",                  15,   Group.STOP )
-    BUTTON                 = ( 64, "button",                   16,   Group.STOP )
-    EMERGENCY_STOP         = ( 65, "emergency-stop",            1,   Group.STOP )
+    EMERGENCY_STOP         = ( 60, "emergency-stop",            3,   Group.STOP )
+    COLLISION_STOP         = ( 61, "collision-stop",            3,   Group.STOP )
+    STOP                   = ( 62, "stop",                     12,   Group.STOP )
+    HALT                   = ( 63, "halt",                     13,   Group.STOP )
+    BRAKE                  = ( 64, "brake",                    14,   Group.STOP )
+    STANDBY                = ( 65, "standby",                  15,   Group.STOP )
 
     # remote ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     REMOTE_A               = ( 70, "remote A",                 10,   Group.REMOTE )
@@ -143,6 +144,10 @@ class Event(Enum):
     INFRARED_PORT          = ( 130, "infrared port",           51,   Group.INFRARED )
     INFRARED_CNTR          = ( 131, "infrared cntr",           50,   Group.INFRARED )
     INFRARED_STBD          = ( 132, "infrared stbd",           51,   Group.INFRARED )
+
+    # imu ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    IMU_OVER_PITCH          = ( 140, "imu over-pitch",         70,   Group.IMU )
+    IMU_OVER_ROLL           = ( 141, "imu over-roll",          70,   Group.IMU )
 
     # velocity directives  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     VELOCITY               = ( 200, "velocity",               100,   Group.VELOCITY ) # with value

@@ -25,7 +25,6 @@ class Orientation(Enum):
     AFT   = (  6, "aft",           'NONE',  "aft")
     PSID  = (  7, "port-side",     'PORT',  "psid")
     SSID  = (  8, "stbd-side",     'STBD',  "ssid")
-
     PFWD  = (  9, "port-fwd",      'PORT',  "pfwd")
     SFWD  = ( 10, "starboard-fwd", 'STBD',  "sfwd")
     PMID  = ( 11, "port-mid",      'PORT',  "pmid")

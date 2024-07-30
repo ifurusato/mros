@@ -29,6 +29,7 @@ from core.logger import Logger, Level
 from core.event import Event, Group
 from core.component import Component
 from core.fsm import FiniteStateMachine
+from core.orientation import Orientation
 from core.util import Util
 from core.message import Message, Payload
 from core.message_bus import MessageBus
@@ -40,10 +41,15 @@ from core.controller import Controller
 from core.publisher import Publisher
 from core.queue_publisher import QueuePublisher
 from core.macro_publisher import MacroPublisher
+from hardware.clock_publisher import ClockPublisher
+from hardware.remote_ctrl_publisher import RemoteControlPublisher
+from hardware.gamepad_publisher import GamepadPublisher
+from hardware.system_publisher import SystemPublisher
 
 from core.subscriber import Subscriber, GarbageCollector
-from core.system_subscriber import SystemSubscriber
+from hardware.system_subscriber import SystemSubscriber
 from core.macro_subscriber import MacroSubscriber
+from hardware.remote_ctrl_subscriber import RemoteControlSubscriber
 #from core.omni_subscriber import OmniSubscriber
 #from core.kr01_macrolibrary import KR01MacroLibrary
 
@@ -51,22 +57,24 @@ from hardware.system import System
 from hardware.screen import Screen
 from hardware.sensor_array import SensorArray
 from hardware.rtof import RangingToF
-from hardware.remote_ctrl_publisher import RemoteControlPublisher
-from hardware.clock_publisher import ClockPublisher
-from hardware.remote_ctrl_subscriber import RemoteControlSubscriber
-
+from hardware.rgbmatrix import RgbMatrix # used for ICM20948
+from hardware.icm20948 import Icm20948
+from hardware.imu import IMU
+from hardware.task_selector import TaskSelector
 from hardware.i2c_scanner import I2CScanner
 #from hardware.battery import BatteryCheck
 #from hardware.killswitch import KillSwitch
+from hardware.digital_pot import DigitalPotentiometer
+from hardware.monitor import Monitor
 from hardware.irq_clock import IrqClock
 from hardware.motion_controller import MotionController
+from hardware.sound import Player, Sound
 #from hardware.status import Status
 from hardware.indicator import Indicator
 
 #from mock.event_publisher import EventPublisher
 #from mock.velocity_publisher import VelocityPublisher
 #from hardware.gamepad_controller import GamepadController
-from hardware.gamepad_publisher import GamepadPublisher
 
 #from behave.behaviour_manager import BehaviourManager
 #from behave.avoid import Avoid
@@ -110,24 +118,32 @@ class MROS(Component, FiniteStateMachine):
         globals.put('mros', self)
         # configuration…
         self._config                 = None
-        self._message_bus            = None
-        self._system_subscriber      = None
-        self._behaviour_mgr          = None
-        self._queue_publisher        = None
-        self._macro_publisher        = None
-        self._clock_publisher        = None
-        self._sensor_array_publisher = None
-        self._rtof_publisher         = None
-        self._remote_ctrl_publisher  = None
-        self._experiment_mgr         = None
+        self._component_registry     = None
         self._controller             = None
-        self._gamepad_publisher      = None
-        self._motion_controller      = None
-#       self._gamepad_controller     = None
+        self._message_bus            = None
         self._external_clock         = None # a Publisher used for accessory timing
         self._irq_clock              = None # used for motor control timing
+        self._slow_irq_clock         = None
+        self._clock_publisher        = None
+        self._gamepad_publisher      = None
+        self._macro_publisher        = None
+        self._queue_publisher        = None
+        self._remote_ctrl_publisher  = None
+        self._rtof_publisher         = None
+        self._sensor_array_publisher = None
+        self._system_publisher       = None
+        self._system_subscriber      = None
+        self._monitor                = None
+        self._icm20948               = None
+        self._imu                    = None
+        self._behaviour_mgr          = None
+        self._experiment_mgr         = None
+        self._motion_controller      = None
+#       self._gamepad_controller     = None
+        self._rgbmatrix              = None
         self._motor_controller       = None
 #       self._killswitch             = None
+        self._digital_pot            = None
         self._screen                 = None
         self._status_light           = None
         self._disable_leds           = False
@@ -181,9 +197,19 @@ class MROS(Component, FiniteStateMachine):
         self._log.info('argument level:       {}'.format(arguments.level))
 
         # scan I2C bus ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        _i2c_scanner = I2CScanner(self._config, self._log.level)
-        _i2c_scanner.print_device_list()
-        self._addresses = _i2c_scanner.get_int_addresses()
+        _i2c_bus0_scanner = I2CScanner(self._config, bus_number=0, level=self._log.level)
+        _i2c_bus0_scanner.print_device_list()
+        self._bus0_addresses = _i2c_bus0_scanner.get_int_addresses()
+
+        _i2c_bus1_scanner = I2CScanner(self._config, bus_number=1, level=self._log.level)
+        _i2c_bus1_scanner.print_device_list()
+        self._bus1_addresses = _i2c_bus1_scanner.get_int_addresses()
+
+        if _i2c_bus1_scanner.has_hex_address(['0x0E']):
+            self._log.info('using digital potentiometer…')
+            self._digital_pot = DigitalPotentiometer(self._config, level=self._log.level)
+            self._digital_pot.set_input_range(0.0, 3.3) # min/max analog value from IO Expander
+            self._digital_pot.set_output_range(0.0, 1.0) # defaults, need to change for specific use
 
         # check for availability of pigpio ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
@@ -211,6 +237,14 @@ class MROS(Component, FiniteStateMachine):
         else:
             self._irq_clock = None
 
+        self._use_slow_external_clock = self._config['mros'].get('use_slow_external_clock')
+        if self._use_slow_external_clock and _pigpio_available:
+            self._log.info('creating slow external clock…')
+            _clock_pin = self._config['mros'].get('hardware').get('irq_clock').get('slow_pin') # pin 23
+            self._slow_irq_clock = IrqClock(self._config, pin=_clock_pin, level=self._level)
+        else:
+            self._slow_irq_clock = None
+
         # JSON configuration dump ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         if _args['json_dump_enabled']:
             print('exporting JSON configuration.')
@@ -219,6 +253,15 @@ class MROS(Component, FiniteStateMachine):
         # create components ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _cfg = self._config['mros'].get('component')
+        self._component_registry = globals.get('component-registry')
+
+        # basic hardware ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+        # LED on mast
+        _pin = 13 # TODO get from config
+        self._status_light = Indicator(_pin, Level.INFO)
+        # TFT screen
+        self._screen = Screen(self._config, Level.INFO)
 
         # create publishers  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
@@ -226,6 +269,10 @@ class MROS(Component, FiniteStateMachine):
 
         if _cfg.get('enable_queue_publisher') or 'q' in _pubs:
             self._queue_publisher = QueuePublisher(self._config, self._message_bus, self._message_factory, self._level)
+
+        _enable_system_publisher = _cfg.get('enable_system_publisher')
+        if _enable_system_publisher:
+            self._system_publisher = SystemPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
 
         _enable_sensor_array_publisher = _cfg.get('enable_sensor_array_publisher')
         if _enable_sensor_array_publisher:
@@ -238,6 +285,16 @@ class MROS(Component, FiniteStateMachine):
 #           self._macro_publisher = MacroPublisher(self._config, self._message_bus, self._message_factory, self._queue_publisher, _callback, self._level)
 #           _library = KR01MacroLibrary(self._macro_publisher)
 #           self._macro_publisher.set_macro_library(_library)
+
+        # include monitor display
+        if self._config['mros'].get('enable_monitor'):
+            self._monitor = Monitor(self._config, level=self._level)
+
+        _enable_imu_publisher = _cfg.get('enable_imu_publisher')
+        if _enable_imu_publisher:
+            self._rgbmatrix = RgbMatrix(enable_port=True, enable_stbd=True, level=self._level)
+            self._icm20948  = Icm20948(self._config, self._rgbmatrix, level=self._level)
+            self._imu = IMU(self._config, self._icm20948, self._message_bus, self._message_factory, level=self._level)
 
         _enable_remote_ctrl_publisher = _cfg.get('enable_remote_ctrl_publisher') or 'i' in _pubs
         if _enable_remote_ctrl_publisher:
@@ -287,10 +344,22 @@ class MROS(Component, FiniteStateMachine):
 #       if _cfg.get('enable_omni_subscriber') or 'o' in _subs:
 #           self._omni_subscriber = OmniSubscriber(self._config, self._message_bus, level=self._level) # reacts to IR sensors
 
+
         # add motion controller (subscriber) ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._log.info('configure motor controller…')
         self._motion_controller = MotionController(self._config, self._message_bus, self._irq_clock, level=self._level)
+
         self._motor_controller = self._motion_controller.motor_controller
+
+        # add task selector ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        if self._slow_irq_clock:
+            if self._rgbmatrix:
+                _stbd_matrix = self._rgbmatrix.get_rgbmatrix(Orientation.STBD)
+                self._task_selector = TaskSelector(rgbmatrix5x5=_stbd_matrix, level=Level.INFO)
+            else:
+                self._task_selector = TaskSelector(level=Level.INFO)
+            self._slow_irq_clock.add_callback(self._task_selector.update)
+            self._motion_controller.assign_tasks(self._task_selector)
 
 #       if self._use_external_clock and self._irq_clock:
 #           self._irq_clock.add_callback(self._motor_controller.external_callback_method)
@@ -332,13 +401,7 @@ class MROS(Component, FiniteStateMachine):
             self._gamepad_publisher = GamepadPublisher(self._config, self._message_bus, self._message_factory, True, self._level)
 #           self._gamepad_controller = GamepadController(self._message_bus, self._level)
 
-        # hardware ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-
-        # LED on mast
-        _pin = 13 # TODO get from config
-        self._status_light = Indicator(_pin, Level.INFO)
-        # TFT screen
-        self._screen = Screen(self._config, Level.INFO)
+        # finish up ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         self._export_config = False
         if self._export_config:
@@ -355,13 +418,24 @@ class MROS(Component, FiniteStateMachine):
         self._log.heading('starting', 'starting m-series robot operating system (mros)…', '[2/2]' )
         FiniteStateMachine.start(self)
 
-        self._screen.off()
+#       self._screen.disable()
         self._status_light.enable()
 
         self._disable_leds = self._config['pi'].get('disable_leds')
         if self._disable_leds:
             # disable Pi LEDs since they may be distracting
             self._set_pi_leds(False)
+
+        if self._slow_irq_clock:
+            self._task_selector.print_tasks()
+
+        if self._irq_clock:
+            self._log.info('enabling external clock…')
+            self._irq_clock.enable()
+
+        if self._slow_irq_clock:
+            self._log.info('enabling slow external clock…')
+            self._slow_irq_clock.enable()
 
 #       if self._killswitch:
 #           self._killswitch.enable()
@@ -381,18 +455,28 @@ class MROS(Component, FiniteStateMachine):
         Component.enable(self)
         FiniteStateMachine.enable(self)
 
-        if self._irq_clock:
-            self._log.info('enabling external clock…')
-            self._irq_clock.enable()
-
         if self._system_subscriber:
             self._log.info('enabling system subscriber…')
             self._system_subscriber.enable()
 
         # print registry of components
-        _component_registry = globals.get('component-registry')
-        _component_registry.print_registry()
+        self._component_registry.print_registry()
 
+        if self._imu and self._icm20948:
+            self._motion_controller.set_imu(self._imu)
+            if not self._icm20948.is_calibrated:
+                _cfg = self._config['mros'].get('hardware').get('icm20948')
+                if _cfg.get('motion_calibrate'):
+                    self._motion_controller.calibrate_imu()
+                elif _cfg.get('bench_calibrate'):
+                    self._icm20948.calibrate()
+            self._icm20948.disable_displays()
+
+        if self._monitor and self._slow_irq_clock:
+            # prefer slow clock
+            self._slow_irq_clock.add_low_frequency_callback(self._monitor.update)
+
+        # ════════════════════════════════════════════════════════════════════
         # now in main application loop until quit or Ctrl-C…
         self._log.info('enabling message bus…')
         self._message_bus.enable()
@@ -407,6 +491,13 @@ class MROS(Component, FiniteStateMachine):
         Returns the application configuration.
         '''
         return self._config
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_component_registry(self):
+        '''
+        Return the registry of all instantiated Components.
+        '''
+        return self._component_registry
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_logger(self):
@@ -513,12 +604,19 @@ class MROS(Component, FiniteStateMachine):
 #       '''
 #       return self._experiment_mgr
 
-#   # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-#   def get_irq_clock(self):
-#       '''
-#       Returns the IRQ clock used for the motor controller, None if not used.
-#       '''
-#       return self._irq_clock
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_irq_clock(self):
+        '''
+        Returns the IRQ clock, None if not used.
+        '''
+        return self._irq_clock
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_slow_irq_clock(self):
+        '''
+        Returns the slow (5Hz) IRQ clock, None if not used.
+        '''
+        return self._slow_irq_clock
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _set_pi_leds(self, enable):
@@ -548,6 +646,7 @@ class MROS(Component, FiniteStateMachine):
         This halts any motor activity, demands a sudden halt of all tasks,
         then shuts down the OS.
         '''
+#       Player.instance().play(Sound.CHIRP_2)
         self._log.info(Fore.MAGENTA + Style.BRIGHT + 'shutting down…')
         self.close()
         # we never get here if we shut down properly
@@ -564,6 +663,8 @@ class MROS(Component, FiniteStateMachine):
             self._log.warning('already closing.')
         elif self.enabled:
             self._log.info('disabling…')
+            if self._task_selector:
+                self._task_selector.close()
             if self._queue_publisher:
                 self._queue_publisher.disable()
             if self._irq_clock and not self._irq_clock.disabled:
@@ -601,8 +702,7 @@ class MROS(Component, FiniteStateMachine):
                 self._log.info('closing…')
                 Component.close(self) # will call disable()
                 self._closing = True
-                _component_registry = globals.get('component-registry')
-                _registry = _component_registry.get_registry()
+                _registry = self._component_registry.get_registry()
                 if self._irq_clock and not self._irq_clock.closed:
                     self._irq_clock.close()
                 # closes all components that are not a publisher, subscriber, the message bus or mros itself…
@@ -622,8 +722,8 @@ class MROS(Component, FiniteStateMachine):
                     self._log.info('closing component…')
 #               if self._motion_controller:
 #                   self._motion_controller.close()
-#               if self._screen:
-#                   self._screen.on()
+                if self._screen:
+                    self._screen.enable()
                 FiniteStateMachine.close(self)
                 self._closing = False
                 self._log.info('application closed.')

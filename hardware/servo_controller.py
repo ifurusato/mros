@@ -342,10 +342,8 @@ class ServoController(Component):
         Slowly recenters the servo. This is suitable for being called by a Thread.
         '''
         try:
-#           _angle = int(servo.angle)
             _angle = int(servo.adjusted_angle)
-            _adj_angle = int(servo.adjusted_angle)
-            self._log.info(Fore.MAGENTA + 'starting angle of servo {}: {:d}°; adj: {:d}°'.format(servo.name, _angle, _adj_angle))
+            self._log.info(Fore.MAGENTA + 'starting angle of servo {}: {:d}°'.format(servo.name, _angle))
             if _angle == 0:
                 self._log.info('servo {} is centered.'.format(servo.name))
             elif _angle > 0:
@@ -380,7 +378,7 @@ class ServoController(Component):
             time.sleep(0.2)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def recenter(self, close_upon_completion):
+    def recenter(self, close_upon_completion=False):
         '''
         Slowly recenters the servos. if 'is_daemon' is True, will block
         application exit until completed.

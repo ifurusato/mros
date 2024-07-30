@@ -28,7 +28,7 @@ _log = Logger('irq-clock-test', Level.INFO)
 def callback_method():
     global _counter, _timestamp, _queue
     _elapsed_ms = (dt.now() - _timestamp).total_seconds() * 1000.0
-    if _queue.full():
+    if _queue.full:
         _queue.poll()
     _queue.push(_elapsed_ms)
     _mean_ms = statistics.median(_queue.queue)
@@ -54,9 +54,7 @@ def main():
 
         # read YAML configuration
         _level = Level.INFO
-        _loader = ConfigLoader(_level)
-        filename = 'config.yaml'
-        _config = _loader.configure(filename)
+        _config = ConfigLoader(Level.INFO).configure() 
 
         _queue = DeQueue(maxsize=20, mode=DeQueue.FIFO)
 

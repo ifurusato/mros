@@ -7,34 +7,53 @@
 #
 # author:   Murray Altheim
 # created:  2019-12-23
-# modified: 2024-05-18
+# modified: 2024-07-15
 #
 # An enum for expressing the Cardinal directions.
 #
 
 from enum import Enum
+from math import pi as pi
 from hardware.color import Color
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Cardinal(Enum):
-    NORTH     = ( 0, 'north' )
-    NORTHEAST = ( 1, 'north-east' )
-    EAST      = ( 2, 'east' )
-    SOUTHEAST = ( 3, 'south-east' )
-    SOUTH     = ( 4, 'south' )
-    SOUTHWEST = ( 5, 'south-west' )
-    WEST      = ( 6, 'west' )
-    NORTHWEST = ( 7, 'north-west' )
-    UNKNOWN   = ( 8, 'unknown' )
+    NORTH     = ( 0, 'north',        0, pi * 2.0 )
+    NORTHEAST = ( 1, 'north-east',  45, -1.0 )
+    EAST      = ( 2, 'east',        90, pi * 1.5 )
+    SOUTHEAST = ( 3, 'south-east', 135, -1.0 )
+    SOUTH     = ( 4, 'south',      180, pi )
+    SOUTHWEST = ( 5, 'south-west', 225, -1.0 )
+    WEST      = ( 6, 'west',       270, pi / 2.0 )
+    NORTHWEST = ( 7, 'north-west', 315, -1.0 )
+    UNKNOWN   = ( 8, 'unknown',     -1, -1.0 )
 
     # ignore the first param since it's already set by __new__
-    def __init__(self, num, display):
-        self._display = display
+    def __init__(self, num, label, degrees, radians):
+        self._label = label
+        self._degrees = degrees
+        self._radians = radians
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
-    def display(self):
-        return self._display
+    def label(self):
+        return self._label
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def degrees(self):
+        '''
+        Return the compass angle in degrees.
+        '''
+        return self._degrees
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def radians(self):
+        '''
+        Return the compass angle in radians.
+        '''
+        return self._radians
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod

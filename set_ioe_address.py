@@ -26,7 +26,7 @@ print('instantiated IO Expander.')
 _i2c_addr = 0x19 # new I2C address
 _ioe.set_i2c_addr(_i2c_addr)
 
-print(Fore.GREEN + 'changed I2C address of IO Expander to 0x{:2X}.'.format(_i2c_addr) + Style.RESET_ALL)
+print(Fore.GREEN + 'changed I2C address of IO Expander to 0x{:02X}.'.format(_i2c_addr) + Style.RESET_ALL)
 
 print('complete.')
 

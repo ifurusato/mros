@@ -136,7 +136,7 @@ class BNO055:
         _counter = itertools.count()
         _count = 0
         _limit = 600
-        self._log.info(Fore.WHITE + Style.BRIGHT + '\n    calibrate by moving sensor in a figure eight motion…\n' + Style.RESET_ALL)
+        self._log.info(Fore.WHITE + Style.BRIGHT + '\n    calibrate by moving sensor in a figure eight motion…\n')
         while True:
             _count = next(_counter)
             _status = self.get_calibration_status()
@@ -144,15 +144,15 @@ class BNO055:
                 break
             if _count % 10 == 0:
                 self._log.info(Fore.CYAN + '[{:d}] trying to calibrate… (calibrated? {}; status: {}; over limit? {})'.format(
-                        _count, _status == Calibration.CALIBRATED, _status, _count > _limit) + Style.RESET_ALL)
+                        _count, _status == Calibration.CALIBRATED, _status, _count > _limit))
             _rate.wait()
         if self.is_calibrated:
-            self._log.info(Fore.GREEN + 'bno055 is calibrated.' + Style.RESET_ALL)
+            self._log.info(Fore.GREEN + 'bno055 is calibrated.')
             if self._play_sound:
                 Player.instance().play(Sound.CHATTER_3)
             self._show_compass_calibration(self._rgbmatrix, 0.0, 0.0, 0.0, 0.0)
         else:
-            self._log.error(Fore.RED + 'bno055 could not be calibrated.' + Style.RESET_ALL)
+            self._log.error(Fore.RED + 'bno055 could not be calibrated.')
         return self.is_calibrated
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -348,7 +348,7 @@ class BNO055:
                         RgbMatrix.set_all(self._rgbmatrix, 40, 40, 40)
                     self._rgbmatrix.show()
 
-#              _cardinal = self.get_cardinal() + Fore.WHITE + _style + '\t {}\n'.format(_cardinal.display.lower()))
+#              _cardinal = self.get_cardinal() + Fore.WHITE + _style + '\t {}\n'.format(_cardinal.label.lower()))
 
 #   #           # pitch ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
