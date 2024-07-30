@@ -171,7 +171,7 @@ class Motor(Component):
 #       for _name, _item in self.__speed_lambdas.copy().items();
         for _name, _lambda in self.__speed_lambdas.copy().items():
             if name == _name or name in _name:
-                self._log.info('removing \'{}\' lambda from motor {}…'.format(_name, self.orientation.name))
+                self._log.info(Fore.MAGENTA + 'removing \'{}\' lambda from motor {}…'.format(_name, self.orientation.name))
                 del self.__speed_lambdas[_name]
 #       for key in self.__speed_lambdas.keys():
 #           if name == key or name in key:
@@ -304,8 +304,8 @@ class Motor(Component):
             _current_target_speed = self.__target_speed
             _new_target_speed = target_speed 
             self.__target_speed = self._slew_limiter.limit(_current_target_speed, _new_target_speed)
-#           self._log.info(Fore.GREEN + 'current speed: {:5.2f}; target speed: {:5.2f}; slewed as: {:5.2f}'.format(
-#                   _current_target_speed, _new_target_speed, self.__target_speed))
+            self._log.info(Fore.GREEN + '🪷 current speed: {:5.2f}; target speed: {:5.2f}; slewed as: {:5.2f}'.format(
+                    _current_target_speed, _new_target_speed, self.__target_speed))
         else:
             self.__target_speed = target_speed
 
@@ -391,7 +391,7 @@ class Motor(Component):
             self.__modified_target_speed = self.__target_speed
             _returned_value = 0.0
             if len(self.__speed_lambdas) > 0:
-                self._log.info('processing {:d} lambdas…'.format(len(self.__speed_lambdas)))
+#               self._log.info('processing {:d} lambdas…'.format(len(self.__speed_lambdas)))
                 for _name, _lambda in self.__speed_lambdas.items():
                     _returned_value = _lambda(self.__modified_target_speed)
                     if isinstance(_returned_value, str):

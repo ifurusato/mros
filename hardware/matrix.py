@@ -26,7 +26,7 @@ try:
     from matrix11x7 import Matrix11x7
     from matrix11x7.fonts import font3x5
     _MATRIX11x7_IMPORTED = True
-    print('imported Matrix11x7.')
+#   print('imported Matrix11x7.')
 except ImportError:
     raise Exception('This script requires the matrix11x7 module\nInstall with: pip3 install --user matrix11x7')
 

@@ -21,7 +21,7 @@
 #
 #   In non-blocking fashion, this plays a WAV file from the SD card of
 #   an Unexpected Maker I2S Audio Shield. The constructor defaults are
-#   for a 16 bit WAV file with a 16kHz sample rate.
+#   for a mono 16 bit WAV file with a 16kHz sample rate.
 #
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 

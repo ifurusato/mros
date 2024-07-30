@@ -19,11 +19,12 @@ from threading import Thread
 from colorama import init, Fore, Style
 init()
 
-from core.rate import Rate
-from core.rotation import Rotation
 from core.component import Component
 from core.direction import Direction
 from core.orientation import Orientation
+from core.rate import Rate
+from core.rotation import Rotation
+from core.steering_mode import SteeringMode
 from core.logger import Logger, Level
 from hardware.i2c_scanner import I2CScanner
 from hardware.motor_configurer import MotorConfigurer
@@ -31,12 +32,16 @@ from hardware.slew_rate import SlewRate
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class MotorController(Component):
-    STOP_LAMBDA_NAME  = "__stop_accum" # TEMP moved to StopHandler
-    PORT_CW_STEERING_LAMBDA_NAME   = "__port_rotate_cw_steering"
-    STBD_CW_STEERING_LAMBDA_NAME   = "__stbd_rotate_cw_steering"
-    PORT_CCW_STEERING_LAMBDA_NAME  = "__port_rotate_ccw_steering"
-    STBD_CCW_STEERING_LAMBDA_NAME  = "__stbd_rotate_ccw_steering"
 
+    STOP_LAMBDA_NAME  = "__stop_accum" # TEMP moved to StopHandler
+    PORT_CW_ROTATE_LAMBDA_NAME   = "__port_rotate_cw_steering"
+    STBD_CW_ROTATE_LAMBDA_NAME   = "__stbd_rotate_cw_steering"
+    PORT_CCW_ROTATE_LAMBDA_NAME  = "__port_rotate_ccw_steering"
+    STBD_CCW_ROTATE_LAMBDA_NAME  = "__stbd_rotate_ccw_steering"
+    FWD_REPOSITION_ROTATE_LAMBDA_NAME = "__fwd_reposition_rotate_steering"
+    AFT_REPOSITION_ROTATE_LAMBDA_NAME = "__aft_reposition_rotate_steering"
+    FWD_REPOSITION_RETURN_LAMBDA_NAME = "__fwd_reposition_return_steering"
+    AFT_REPOSITION_RETURN_LAMBDA_NAME = "__aft_reposition_return_steering"
     '''
     The controller for 4-6 motors:
 
@@ -107,6 +112,11 @@ class MotorController(Component):
         self._stbd_cw_rotate_lambda = lambda speed: -1.0 * speed * self._rotation_speed_multiplier
         self._port_ccw_rotate_lambda = lambda speed: -1.0 * speed * self._rotation_speed_multiplier
         self._stbd_ccw_rotate_lambda = lambda speed: speed * self._rotation_speed_multiplier
+        # lambdas to alter direction to comply with repositioning steering servos
+        self._fwd_reposition_rotate_lambda = lambda speed: speed * self._rotation_speed_multiplier
+        self._aft_reposition_rotate_lambda = lambda speed: -1.0 * speed * self._rotation_speed_multiplier
+        self._fwd_reposition_return_lambda = lambda speed: -1.0 * speed * self._rotation_speed_multiplier
+        self._aft_reposition_return_lambda = lambda speed: speed * self._rotation_speed_multiplier
         self._theta          = 0.0
         self._stbd_speed     = 0.0
         self._port_speed     = 0.0
@@ -325,19 +335,6 @@ class MotorController(Component):
             _lambda_count += _motor.speed_multiplier_count
         return _lambda_count > 0
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def reset_stopping(self):
-        # then we've reached a stop, so remove any stopping features
-        self._log.info(Fore.GREEN + 'reset stopping.')
-        for _motor in self._all_motors:
-            if _motor.has_speed_multiplier(MotorController.STOP_LAMBDA_NAME):
-                _motor.remove_speed_multiplier(MotorController.STOP_LAMBDA_NAME)
-            if _motor.has_speed_multiplier(MotorController.HALT_LAMBDA_NAME):
-                _motor.remove_speed_multiplier(MotorController.HALT_LAMBDA_NAME)
-            if _motor.has_speed_multiplier(MotorController.BRAKE_LAMBDA_NAME):
-                _motor.remove_speed_multiplier(MotorController.BRAKE_LAMBDA_NAME)
-        self._reset_slew_rate()
-
   # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
     def is_stopped(self):
@@ -410,13 +407,13 @@ class MotorController(Component):
 #           raise TypeError('expected a motor orientation, not {}'.format(orientation))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    @property
-    def rotation_speed_multiplier(self):
-        return self._rotation_speed_multiplier
+#   @property
+#   def rotation_speed_multiplier(self):
+#       return self._rotation_speed_multiplier
 
-    @rotation_speed_multiplier.setter
-    def rotation_speed_multiplier(self, rotation_speed_multiplier):
-        self._rotation_speed_multiplier = rotation_speed_multiplier
+#   @rotation_speed_multiplier.setter
+#   def rotation_speed_multiplier(self, rotation_speed_multiplier):
+#       self._rotation_speed_multiplier = rotation_speed_multiplier
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def rotate(self, rotation):
@@ -428,37 +425,72 @@ class MotorController(Component):
         if rotation is None:
             raise ValueError('rotation argument not provided.')
         self._log.info('🍐 rotate {}; current rotation speed multiplier: {:5.2f}'.format(rotation, self._rotation_speed_multiplier))
-        self._rotation = rotation # TODO is this necessary as a class variable?
 #       self.__callback = None
-        if self._rotation is Rotation.STOPPED:
+        self.reset_rotating()
+        if rotation is Rotation.STOPPED:
             self._log.info('🍐 no rotation.')
-            for _motor in self._all_motors:
-                _motor.clear_speed_multipliers()
+            self._reset_slew_rate()
             self.set_motor_speed(Orientation.PFWD, 0.0)
             self.set_motor_speed(Orientation.SFWD, 0.0) 
 #           self.set_motor_speed(Orientation.PMID, 0.0)
 #           self.set_motor_speed(Orientation.SMID, 0.0)
             self.set_motor_speed(Orientation.PAFT, 0.0)
             self.set_motor_speed(Orientation.SAFT, 0.0)
-            return
-        elif self._rotation is Rotation.CLOCKWISE:
+        elif rotation is Rotation.CLOCKWISE:
+            self._set_slew_rate(SlewRate.FASTEST)
             self._log.info('🍐 rotate clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
-            self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CW_STEERING_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
-#           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CW_STEERING_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
-            self._paft_motor.add_speed_multiplier(MotorController.PORT_CW_STEERING_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
-            self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CW_STEERING_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
-#           self._smid_motor.add_speed_multiplier(MotorController.STBD_CW_STEERING_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
-            self._saft_motor.add_speed_multiplier(MotorController.STBD_CW_STEERING_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
-        elif self._rotation is Rotation.COUNTER_CLOCKWISE:
+            self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CW_ROTATE_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
+#           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CW_ROTATE_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
+            self._paft_motor.add_speed_multiplier(MotorController.PORT_CW_ROTATE_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
+            self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CW_ROTATE_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+#           self._smid_motor.add_speed_multiplier(MotorController.STBD_CW_ROTATE_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+            self._saft_motor.add_speed_multiplier(MotorController.STBD_CW_ROTATE_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+        elif rotation is Rotation.COUNTER_CLOCKWISE:
+            self._set_slew_rate(SlewRate.FASTEST)
             self._log.info('🍐 rotate counter-clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
-            self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CCW_STEERING_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
-#           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CCW_STEERING_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
-            self._paft_motor.add_speed_multiplier(MotorController.PORT_CCW_STEERING_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
-            self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CCW_STEERING_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
-#           self._smid_motor.add_speed_multiplier(MotorController.STBD_CCW_STEERING_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
-            self._saft_motor.add_speed_multiplier(MotorController.STBD_CCW_STEERING_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+            self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CCW_ROTATE_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
+#           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CCW_ROTATE_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
+            self._paft_motor.add_speed_multiplier(MotorController.PORT_CCW_ROTATE_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
+            self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CCW_ROTATE_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+#           self._smid_motor.add_speed_multiplier(MotorController.STBD_CCW_ROTATE_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+            self._saft_motor.add_speed_multiplier(MotorController.STBD_CCW_ROTATE_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
         else:
-            raise Exception('expected clockwise or counter-clockwise argument.')
+            raise Exception('expected stopped, clockwise or counter-clockwise argument.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def reposition(self, steering_mode):
+        '''
+        This sets the callback to set the motors for steering mode 
+        repositioning in the prescribed direction. This adds a lambda 
+        to the motors to alter their rotation to comply with the change
+        in steering mode movement. 
+        '''
+        if steering_mode is None:
+            raise ValueError('steering mode argument not provided.')
+        self._log.info('🌸 steering mode: {}; current rotation speed multiplier: {:5.2f}'.format(steering_mode, self._rotation_speed_multiplier))
+#       self.__callback = None
+        self.reset_rotating()
+        if steering_mode is SteeringMode.NONE:
+            self._log.info('🌸 steering mode: NONE')
+            self._reset_slew_rate()
+            self.set_motor_speed(Orientation.PFWD, 0.0)
+            self.set_motor_speed(Orientation.SFWD, 0.0) 
+            self.set_motor_speed(Orientation.PAFT, 0.0)
+            self.set_motor_speed(Orientation.SAFT, 0.0)
+        elif steering_mode is SteeringMode.ROTATE:
+            self._set_slew_rate(SlewRate.FASTEST)
+            self._log.info('🌸 reposition for ROTATE mode; rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+            self._pfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_ROTATE_LAMBDA_NAME, self._fwd_reposition_rotate_lambda, True)
+            self._sfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_ROTATE_LAMBDA_NAME, self._fwd_reposition_rotate_lambda, True)
+            self._paft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_ROTATE_LAMBDA_NAME, self._aft_reposition_rotate_lambda, True)
+            self._saft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_ROTATE_LAMBDA_NAME, self._aft_reposition_rotate_lambda, True)
+        else: # e.g., AFRS
+            self._set_slew_rate(SlewRate.FASTEST)
+            self._log.info('🌸 reposition for non-ROTATE mode; rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+            self._pfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_RETURN_LAMBDA_NAME, self._fwd_reposition_return_lambda, True)
+            self._sfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_RETURN_LAMBDA_NAME, self._fwd_reposition_return_lambda, True)
+            self._paft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_RETURN_LAMBDA_NAME, self._aft_reposition_return_lambda, True)
+            self._saft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_RETURN_LAMBDA_NAME, self._aft_reposition_return_lambda, True)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def clamp(self, value):
@@ -493,6 +525,28 @@ class MotorController(Component):
             if not _motor.is_stopped:
                 return False
         return True
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def reset_stopping(self):
+        # then we've reached a stop, so remove any stopping features
+        self._log.info(Fore.GREEN + 'reset stopping.')
+        for _motor in self._all_motors:
+            if _motor.has_speed_multiplier(MotorController.STOP_LAMBDA_NAME):
+                _motor.remove_speed_multiplier(MotorController.STOP_LAMBDA_NAME)
+            if _motor.has_speed_multiplier(MotorController.HALT_LAMBDA_NAME):
+                _motor.remove_speed_multiplier(MotorController.HALT_LAMBDA_NAME)
+            if _motor.has_speed_multiplier(MotorController.BRAKE_LAMBDA_NAME):
+                _motor.remove_speed_multiplier(MotorController.BRAKE_LAMBDA_NAME)
+        self._reset_slew_rate()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def reset_rotating(self):
+        # then we've reached a stop, so remove any rotation features
+        self._log.info(Fore.GREEN + 'reset stopping.')
+        for _motor in self._all_motors:
+            _motor.remove_speed_multiplier('rotate')
+        self._reset_slew_rate()
+        self.list_speed_multipliers() # TEMP
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def clear_speed_multipliers(self):

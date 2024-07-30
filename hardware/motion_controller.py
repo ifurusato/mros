@@ -33,13 +33,14 @@ from core.rotation import Rotation
 from core.util import Util
 from core.chadburn import Chadburn
 from core.steering_angle import SteeringAngle
+from core.steering_mode import SteeringMode
 from core.event import Event, Group
 from core.orientation import Orientation
 from core.subscriber import Subscriber
 from core.logger import Logger, Level
 from hardware.task_selector import TaskSelector
 from hardware.stop_handler import StopHandler
-from hardware.servo_controller import ServoController, SteeringMode
+from hardware.servo_controller import ServoController
 from hardware.headlight import Headlight
 from hardware.servo import Servo
 from hardware.sensor_array import SensorData
@@ -105,6 +106,7 @@ class MotionController(Subscriber):
         self._incr_clamp = lambda n: max(min(7, n), -7)
         self._pot        = None # used for manual control
         self._default_manual_speed = _cfg.get('default_manual_speed')
+        self._reposition_time_delay_sec = _cfg.get('reposition_time_delay_sec') # 3.4
         # servo controller # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._servo_controller = ServoController(config, level=level)
         self._all_servos = self._servo_controller.get_servos()
@@ -129,7 +131,7 @@ class MotionController(Subscriber):
         self._stop_handler = StopHandler(config, self._motor_controller, level)
         # subscribe to event groups ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self.add_events(Event.by_groups([Group.GAMEPAD, Group.BUMPER, Group.IMU, Group.STOP, Group.VELOCITY]))
-        self._log.info(Fore.WHITE + 'registered {} events.'.format(len(self._events)))
+        self._log.info('registered {} events.'.format(len(self._events)))
         # headlight ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._headlight = Headlight(Orientation.STBD)
         # chadburn events ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -421,6 +423,50 @@ class MotionController(Subscriber):
             self._stbd_motor_ratio = 1.0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def reposition(self, steering_mode):
+        '''
+        Reposition for a steering mode change, with a coordinated motor
+        movement to avoid dragging the wheels.
+
+        Ramp motor speed up for half the time, ramp down for the other half,
+        doing this in steps, from the minimum speed required for movement
+        to the top rotational speed. Once half-way, ramp down.
+        '''
+        _is_daemon = True
+        _t_saft = Thread(target = self._reposition_motors, args=[steering_mode], name='reposition', daemon=_is_daemon)
+        _t_saft.start()
+        # set servos to ROTATE position
+        if steering_mode  is SteeringMode.ROTATE:
+            self._log.info('repositioning for rotation')
+            self._servo_controller.set_mode(SteeringMode.ROTATE, 0.3)
+        else:
+            self._log.info('repositioning for skid/afsr steering')
+            self._servo_controller.set_mode(SteeringMode.SKID, 0.3)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _reposition_motors(self, steering_mode):
+        # ten steps up, ten steps down = 20 steps
+        _step_delay_sec = self._reposition_time_delay_sec / 20.0
+        _min_speed = 0.09 # ~Chadburn.DEAD_SLOW 0.07
+        _max_speed = Chadburn.SLOW_AHEAD.speed # 0.21
+        _speed_step = ( _max_speed - _min_speed ) / 10.0
+        self._motor_controller.reposition(steering_mode)
+        # ramp up
+        for _speed in Util.frange(_min_speed, _max_speed, _speed_step):
+            self._motor_controller.set_speed(Orientation.PORT, _speed)
+            self._motor_controller.set_speed(Orientation.STBD, _speed)
+            time.sleep(_step_delay_sec)
+        # ramp down
+        for _speed in Util.frange(_max_speed, _min_speed, -1.0 * _speed_step):
+            self._motor_controller.set_speed(Orientation.PORT, _speed)
+            self._motor_controller.set_speed(Orientation.STBD, _speed)
+            time.sleep(_step_delay_sec)
+        self._motor_controller.set_speed(Orientation.PORT, 0.0)
+        self._motor_controller.set_speed(Orientation.STBD, 0.0)
+        self._motor_controller.reposition(Rotation.STOPPED)
+        self._log.info('repositioning complete.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def change_speed(self, value):
         '''
         Change the current speed (for all motors) by a scaled increment
@@ -689,8 +735,6 @@ class MotionController(Subscriber):
         self._log.info(Style.BRIGHT + 'starting heading: {:5.2f}°; target heading: {:5.2f}𝛑;'.format(_starting_heading, _target_heading)
                 + Fore.YELLOW + ' diff: {}°'.format(_diff_deg))
 
-#       _rotation_speed = self._config['mros'].get('motor_controller').get('rotation_speed')
-#       _target_speed = _rotation_speed
         _target_speed = self._digital_pot.get_scaled_value() # values 0.0-1.0
 
         # change to rotate mode ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -717,7 +761,6 @@ class MotionController(Subscriber):
 
                 if isclose(_target_speed, 0.0, abs_tol=1e-4):
 #                   _multiplier = 0.0
-#                   self._motor_controller.rotation_speed_multiplier = _multiplier
                     self._motor_controller.set_speed(Orientation.PORT, 0.0)
                     self._motor_controller.set_speed(Orientation.STBD, 0.0)
                     self._log.info(Fore.BLACK + 'target speed: {:.2f}; '.format(_target_speed)
@@ -726,7 +769,6 @@ class MotionController(Subscriber):
                 else:
                     _clamped_speed = _max_speed_clamp(_target_speed) # we never want to go faster than ONE_THIRD
                     _clamped_speed = _min_speed_clamp(_clamped_speed) # we never want to go slower than DEAD_SLOW
-#                   self._motor_controller.rotation_speed_multiplier = _multiplier
                     self._motor_controller.set_speed(Orientation.PORT, _clamped_speed)
                     self._motor_controller.set_speed(Orientation.STBD, _clamped_speed)
                     self._log.info(Fore.CYAN + 'target/clamped speed: {:.2f}/{:4.2f}; '.format(_target_speed, _clamped_speed)

@@ -27,11 +27,10 @@ from core.component import Component
 from core.event import Event
 from core.orientation import Orientation
 from core.rate import Rate
+from core.steering_mode import SteeringMode
 from core.message import Message, Payload
 from hardware.servo import Servo
-from hardware.steering_mode import SteeringMode
 from hardware.slew_rate import SlewRate
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class ServoController(Component):
@@ -137,11 +136,13 @@ class ServoController(Component):
             raise Exception('unsupported orientation.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_mode(self, steering_mode):
+    def set_mode(self, steering_mode, initial_delay=0.0):
         '''
         Sets the angles of the servos according to the steering mode. These
         are all fixed angles.
         '''
+        if initial_delay > 0.0:
+            time.sleep(initial_delay)
         if steering_mode is None:
             raise ValueError('null steering mode argument.')
         elif steering_mode is SteeringMode.ACKERMANN:

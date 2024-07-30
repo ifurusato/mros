@@ -108,6 +108,7 @@ mros:
         afrs_max_angle:                      45.0          # maximum AFRS turn angle
         default_manual_speed:                 0.39         # default speed used when potentiometer is unavailable (one third ahead)
         play_sound:                        True            # if True, play sound to indicate calibration
+        reposition_time_delay_sec:            3.4          # how long to run the motors when repositioning the servos
     stop_handler:                                          # offloads stop handling for motor controller
         stop_ratio:                           0.25         # multiplier for stopping lambda
         halt_ratio:                           0.85         # multiplier for halting lambda
