@@ -36,6 +36,10 @@ class I2CScanner(object):
     '''
     def __init__(self, config, bus_number=1, level=Level.INFO):
         super().__init__()
+        if not isinstance(bus_number, int):
+            raise ValueError('expected bus number as an int.')
+        elif not isinstance(level, Level):
+            raise ValueError('expected log level as a Level enum.')
         self._log = Logger('i2cscan', level)
         self._config = config
         self._int_list = []
@@ -165,7 +169,7 @@ def main():
     level = Level.INFO
     log = Logger('main', level)
     log.info('scanning for I²C devices…')
-    scanner = I2CScanner(Level.INFO)
+    scanner = I2CScanner(level=Level.INFO)
 
     _addresses = scanner.get_int_addresses()
     log.info('available I²C device(s):')

@@ -26,7 +26,8 @@ from core.rate import Rate
 from core.logger import Logger, Level
 import hardware.ThunderBorg3
 from hardware.ThunderBorg3 import ThunderBorg, ScanForThunderBorg, SetNewAddress
-from hardware.sound import Sound, Player
+from hardware.sound import Sound
+from hardware.player import Player
 
 _level = Level.INFO
 _log = Logger('test', _level)

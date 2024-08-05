@@ -22,7 +22,8 @@ from core.event import Event, Group
 from core.orientation import Orientation
 from core.subscriber import Subscriber
 from hardware.color import Color
-from hardware.sound import Player, Sound
+from hardware.sound import Sound
+from hardware.player import Player
 from hardware.i2c_scanner import I2CScanner
 from rgbmatrix5x5 import RGBMatrix5x5
 
@@ -38,8 +39,8 @@ class RemoteControlSubscriber(Subscriber):
     '''
     def __init__(self, config, message_bus, level=Level.INFO):
         Subscriber.__init__(self, RemoteControlSubscriber.CLASS_NAME, config, message_bus=message_bus, suppressed=False, enabled=False, level=level)
-        _i2c_scanner = I2CScanner(config, Level.WARN)
-        if _i2c_scanner.has_address([0x74]):
+        _i2c_scanner = I2CScanner(config, level=Level.WARN)
+        if _i2c_scanner.has_hex_address(['0x74']):
             self._stbd_rgbmatrix = RGBMatrix5x5(address=0x74)
             self._stbd_rgbmatrix.set_brightness(0.8)
             self._stbd_rgbmatrix.set_clear_on_exit()

@@ -35,7 +35,7 @@ try:
     _log.info("start...")
 
     _config = ConfigLoader(Level.INFO).configure()
-    _screen = Screen(_config, Level.INFO)
+#   _screen = Screen(_config, Level.INFO)
 #   _screen.disable()
 
     _log.info("scanning for thunderborgs...")

@@ -38,7 +38,7 @@ class AnalogPotentiometer(object):
         self._adc_pin = _config.get('adc_pin')
         self._log.info('analog potentiometer pin assignment: {:d};'.format(self._adc_pin))
         # configure IO Expander board
-        _i2c_scanner = I2CScanner(config, level)
+        _i2c_scanner = I2CScanner(config, level=level)
         if _i2c_scanner.has_address([self._i2c_address]):
             self._log.info('found IO Expander at address 0x{:02X}, configuring…'.format(self._i2c_address))
             try:

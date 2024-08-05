@@ -158,7 +158,7 @@ class Motor(Component):
         if name in self.__speed_lambdas:
             self._log.warning('motor already contains a \'{}\' lambda.'.format(name))
         else:
-            self._log.info('adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
+#           self._log.info('adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
             self.__speed_lambdas[name] = lambda_function
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -167,18 +167,10 @@ class Motor(Component):
         Removes a named (or partial-named) speed multiplier from the dict of
         lambda functions.
         '''
-#       _removed = []
-#       for _name, _item in self.__speed_lambdas.copy().items();
         for _name, _lambda in self.__speed_lambdas.copy().items():
             if name == _name or name in _name:
-                self._log.info(Fore.MAGENTA + 'removing \'{}\' lambda from motor {}…'.format(_name, self.orientation.name))
+#               self._log.info('removing \'{}\' lambda from motor {}…'.format(_name, self.orientation.name))
                 del self.__speed_lambdas[_name]
-#       for key in self.__speed_lambdas.keys():
-#           if name == key or name in key:
-#               _removed.append(key)
-#       for _key in _removed:
-#           self._log.info('removing \'{}\' lambda from motor {}…'.format(_key, self.orientation.name))
-#           del self.__speed_lambdas[_key]
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def has_speed_multiplier(self, name):
@@ -304,8 +296,8 @@ class Motor(Component):
             _current_target_speed = self.__target_speed
             _new_target_speed = target_speed 
             self.__target_speed = self._slew_limiter.limit(_current_target_speed, _new_target_speed)
-            self._log.info(Fore.GREEN + '🪷 current speed: {:5.2f}; target speed: {:5.2f}; slewed as: {:5.2f}'.format(
-                    _current_target_speed, _new_target_speed, self.__target_speed))
+#           self._log.info(Fore.GREEN + 'current speed: {:5.2f}; target speed: {:5.2f}; slewed as: {:5.2f}'.format(
+#                   _current_target_speed, _new_target_speed, self.__target_speed))
         else:
             self.__target_speed = target_speed
 

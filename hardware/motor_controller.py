@@ -323,7 +323,7 @@ class MotorController(Component):
         '''
         _currently_is_stopped = self.is_stopped
         if _currently_is_stopped != self._is_stopped:
-            self._log.info(Fore.WHITE + 'changed state: stopped? {}'.format(_currently_is_stopped))
+#           self._log.debug('changed state: stopped? {}'.format(_currently_is_stopped))
             for _callback in self.__state_change_callbacks:
                 _callback()
         self._is_stopped = _currently_is_stopped
@@ -467,11 +467,10 @@ class MotorController(Component):
         '''
         if steering_mode is None:
             raise ValueError('steering mode argument not provided.')
-        self._log.info('🌸 steering mode: {}; current rotation speed multiplier: {:5.2f}'.format(steering_mode, self._rotation_speed_multiplier))
-#       self.__callback = None
+#       self._log.debug('steering mode: {}; current rotation speed multiplier: {:5.2f}'.format(steering_mode, self._rotation_speed_multiplier))
         self.reset_rotating()
         if steering_mode is SteeringMode.NONE:
-            self._log.info('🌸 steering mode: NONE')
+#           self._log.debug('steering mode: NONE')
             self._reset_slew_rate()
             self.set_motor_speed(Orientation.PFWD, 0.0)
             self.set_motor_speed(Orientation.SFWD, 0.0) 
@@ -479,14 +478,14 @@ class MotorController(Component):
             self.set_motor_speed(Orientation.SAFT, 0.0)
         elif steering_mode is SteeringMode.ROTATE:
             self._set_slew_rate(SlewRate.FASTEST)
-            self._log.info('🌸 reposition for ROTATE mode; rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+#           self._log.debug('reposition for ROTATE mode; rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
             self._pfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_ROTATE_LAMBDA_NAME, self._fwd_reposition_rotate_lambda, True)
             self._sfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_ROTATE_LAMBDA_NAME, self._fwd_reposition_rotate_lambda, True)
             self._paft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_ROTATE_LAMBDA_NAME, self._aft_reposition_rotate_lambda, True)
             self._saft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_ROTATE_LAMBDA_NAME, self._aft_reposition_rotate_lambda, True)
         else: # e.g., AFRS
             self._set_slew_rate(SlewRate.FASTEST)
-            self._log.info('🌸 reposition for non-ROTATE mode; rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+#           self._log.debug('reposition for non-ROTATE mode; rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
             self._pfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_RETURN_LAMBDA_NAME, self._fwd_reposition_return_lambda, True)
             self._sfwd_motor.add_speed_multiplier(MotorController.FWD_REPOSITION_RETURN_LAMBDA_NAME, self._fwd_reposition_return_lambda, True)
             self._paft_motor.add_speed_multiplier(MotorController.AFT_REPOSITION_RETURN_LAMBDA_NAME, self._aft_reposition_return_lambda, True)
@@ -529,7 +528,7 @@ class MotorController(Component):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def reset_stopping(self):
         # then we've reached a stop, so remove any stopping features
-        self._log.info(Fore.GREEN + 'reset stopping.')
+#       self._log.debug('reset stopping.')
         for _motor in self._all_motors:
             if _motor.has_speed_multiplier(MotorController.STOP_LAMBDA_NAME):
                 _motor.remove_speed_multiplier(MotorController.STOP_LAMBDA_NAME)
@@ -542,24 +541,22 @@ class MotorController(Component):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def reset_rotating(self):
         # then we've reached a stop, so remove any rotation features
-        self._log.info(Fore.GREEN + 'reset stopping.')
+#       self._log.debug('reset stopping.')
         for _motor in self._all_motors:
             _motor.remove_speed_multiplier('rotate')
         self._reset_slew_rate()
-        self.list_speed_multipliers() # TEMP
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def clear_speed_multipliers(self):
         '''
         Clear all motor speed control lambda functions from all motors.
         '''
-        self._log.info(Fore.MAGENTA + Style.BRIGHT + 'A. clear lambdas: xxxxxx xxxxxx xxxxxx xxxxx xxxxxxx xxxxxx ')
         for _motor in self._all_motors:
             if _motor:
                 _motor.clear_speed_multipliers()
             else:
                 raise Exception('null motor in clear list.')
-        self._log.info(Fore.MAGENTA + Style.BRIGHT + 'B. clear lambdas: xxxxxx xxxxxx xxxxxx xxxxx xxxxxxx xxxxxx ')
+        self._log.info(Fore.MAGENTA + Style.BRIGHT + 'cleared all speed multiplier lambdas  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ ')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def list_speed_multipliers(self):

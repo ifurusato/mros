@@ -46,7 +46,8 @@ from hardware.servo import Servo
 from hardware.sensor_array import SensorData
 from hardware.motor_controller import MotorController
 from hardware.motion_coordinator import MotionCoordinator
-from hardware.sound import Sound, Player
+from hardware.sound import Sound
+from hardware.player import Player
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class MotionController(Subscriber):
@@ -423,7 +424,7 @@ class MotionController(Subscriber):
             self._stbd_motor_ratio = 1.0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def reposition(self, steering_mode):
+    def reposition(self, steering_mode, callback):
         '''
         Reposition for a steering mode change, with a coordinated motor
         movement to avoid dragging the wheels.
@@ -433,8 +434,7 @@ class MotionController(Subscriber):
         to the top rotational speed. Once half-way, ramp down.
         '''
         _is_daemon = True
-        _t_saft = Thread(target = self._reposition_motors, args=[steering_mode], name='reposition', daemon=_is_daemon)
-        _t_saft.start()
+        _t_saft = Thread(target = self._reposition_motors, args=[steering_mode, callback], name='reposition', daemon=_is_daemon)
         # set servos to ROTATE position
         if steering_mode  is SteeringMode.ROTATE:
             self._log.info('repositioning for rotation')
@@ -442,6 +442,7 @@ class MotionController(Subscriber):
         else:
             self._log.info('repositioning for skid/afsr steering')
             self._servo_controller.set_mode(SteeringMode.SKID, 0.3)
+        _t_saft.start()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _reposition_motors(self, steering_mode):
@@ -705,7 +706,10 @@ class MotionController(Subscriber):
         Player.instance().play(Sound.CHATTER_5)
 
     # ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈ ┈┈┈┈
-    def rotate_sigint_handler(self, signal, frame):
+    def _rotate_sigint_handler(self, signal, frame):
+        '''
+        Theoretically handles a Ctrl-C when trying to set the heading.
+        '''
         self._log.info(Fore.WHITE + '\nCtrl-C caught by signal; exiting…')
         self._motor_controller.stop()
 #       self._motor_controller.set_speed(Orientation.PORT, 0.0)
@@ -720,7 +724,7 @@ class MotionController(Subscriber):
             raise Exception('cannot proceed: no digital potentiometer available.')
         self._prepare_to_move()
         # this is somehow necessary as Ctrl-C isn't normally getting caught in this loop.
-        signal.signal(signal.SIGINT, self.rotate_sigint_handler)
+        signal.signal(signal.SIGINT, self._rotate_sigint_handler)
 
         _ACTIVATE_MOTION = True
         self._log.info('turning ' + Fore.YELLOW + '{}'.format(rotation.label) + Fore.CYAN + ' to heading ' + Fore.YELLOW + '{}…'.format(cardinal.label))
@@ -814,18 +818,21 @@ class MotionController(Subscriber):
             self._motor_controller.rotate(rotation)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _calibrate_loop(self):
+    def _calibrate_movement(self):
         '''
         Performs the physical movement of rotating the robot clockwise through
         a complete circle, mimicking the accumulation of statistics to determine
         following the rotation if the values have approached stability.
         '''
-        self._log.info(Fore.GREEN + 'begin calibration loop...')
+        self._log.info(Fore.YELLOW + '😨 a. begin calibration loop...')
         if self._imu is None:
             raise Exception('cannot calibrate: IMU has not been set.')
         _icm20948 = self._imu.icm20948
 
+        self._log.info(Fore.YELLOW + '😨 b. ')
         self.set_steering_mode(SteeringMode.ROTATE)
+#       self.reposition(SteeringMode.ROTATE)
+
         time.sleep(3) # wait until the servos are clearly finished moving
 
         if not _icm20948.enabled:
@@ -859,7 +866,6 @@ class MotionController(Subscriber):
             _steps = _motor.steps
             _step_count += abs(_steps)
             _heading = _icm20948.uncalibrated_heading
-
             # add to queue
             if _icm20948.calibration_check(_heading):
                 self._log.info(Fore.GREEN + Style.BRIGHT + 'IMU was calibrated while moving.')
@@ -873,6 +879,7 @@ class MotionController(Subscriber):
         self._log.info('exited loop.')
 
         self.rotate(Rotation.STOPPED)
+#       self.reposition(SteeringMode.AFRS)
         # in theory we should be re-enabling bumpers after 'taking a break'
 
         # recenter before proceeding...
@@ -913,7 +920,7 @@ class MotionController(Subscriber):
         if self._play_sound:
             self._player.play(Sound.CHATTER_2)
         self._log.info(Style.BRIGHT + 'calibrating IMU…')
-        self._calibrate_loop_thread = Thread(name='calibrate_thread', target=MotionController._calibrate_loop, args=[self], daemon=True)
+        self._calibrate_loop_thread = Thread(name='calibrate_thread', target=MotionController._calibrate_movement, args=[self], daemon=True)
         self._calibrate_loop_thread.start()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

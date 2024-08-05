@@ -47,6 +47,7 @@ from core.rate import Rate
 from core.logger import Logger, Level
 from core.component import Component
 from hardware.irq_clock import IrqClock
+from hardware.ina260_sensor import Ina260
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Monitor(Component):
@@ -72,6 +73,7 @@ class Monitor(Component):
         self._batt_max  = 21.5 # theoretical 18v LiOn battery max
         self._pi_max    = 5.25 # Pi operating range: 4.75 to 5.25V
         self._logic_max = 3.5 # 3v3 logic max
+        self._max_current = 15.0 # theoretical maximum current (fused)
         self._network_interface_name = None
         self._bar_width       = 52
         self._bar_width_full  = 95
@@ -105,6 +107,11 @@ class Monitor(Component):
             self._ads1015.set_sample_rate(860)
         self._reference = self._ads1015.get_reference_voltage()
         self._log.info('Reference voltage: {:6.3f}v'.format(self._reference))
+        _component_registry = globals.get('component-registry')
+        self._ina260 = _component_registry.get('ina260')
+        if self._ina260 is None:
+            self._ina260 = Ina260(config, level=level)
+
         _use_thread = True
         if _use_thread:
             # update thread ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -116,7 +123,6 @@ class Monitor(Component):
             self.enable()
         else:
             # IRQ Clock ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-            _component_registry = globals.get('component-registry')
             self._irq_clock = _component_registry.get('irq-clock-slo')
             if self._irq_clock is None:
                 CLOCK_PIN = 23
@@ -217,6 +223,9 @@ class Monitor(Component):
     def get_3v3(self):
         return self._ads1015.get_compensated_voltage(channel='in2/ref', reference_voltage=self._reference)
 
+    def get_current(self):
+        return self._ina260.current
+
     # drawing ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
     def _draw_text(self, draw, margin_x, line_num, text):
@@ -277,7 +286,7 @@ class Monitor(Component):
                 _battery = self.get_battery()
                 self._draw_text(draw, 0, 4, "Batt")
                 if _battery < self._batt_max:
-                    self._draw_text(draw, self._margin_x_figure, 4, " {:5.1f}v".format(_battery))
+                    self._draw_text(draw, self._margin_x_figure, 4, " {:5.1f}V".format(_battery))
                     self._draw_bar(draw, 4, ( _battery / self._batt_max * 100.0) )
                 else:
                     self._draw_bar_full(draw, 4)
@@ -286,7 +295,7 @@ class Monitor(Component):
                 _5v_reg = self.get_5v_regulator()
                 self._draw_text(draw, 0, 5, "5vRg")
                 if _5v_reg < self._pi_max:
-                    self._draw_text(draw, self._margin_x_figure, 5, " {:5.2f}v".format(_5v_reg))
+                    self._draw_text(draw, self._margin_x_figure, 5, " {:5.2f}V".format(_5v_reg))
                     self._draw_bar(draw, 5, ( _5v_reg / self._pi_max * 100.0) )
                 else:
                     self._draw_bar_full(draw, 5)
@@ -295,22 +304,31 @@ class Monitor(Component):
                 _3v3_reg = self.get_3v3()
                 self._draw_text(draw, 0, 6, "3v3")
                 if _3v3_reg < self._logic_max:
-                    self._draw_text(draw, self._margin_x_figure, 6, " {:5.2f}v".format(_3v3_reg))
+                    self._draw_text(draw, self._margin_x_figure, 6, " {:5.2f}V".format(_3v3_reg))
                     self._draw_bar(draw, 6, ( _3v3_reg / self._logic_max * 100.0) )
                 else:
                     self._draw_bar_full(draw, 6)
     
-                # line 7 : IP address  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-                self._draw_text(draw, 0, 7, self.get_ip(self._network_interface_name))
-    
-                # line 8 : uptime ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-                self._draw_text(draw, 0, 8, self.get_uptime())
-    
-                # line 9 : timestamp or callback ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-                if self._permit_callback and self.__callback is not None:
-                    self._draw_text(draw, 0, 9, self.get_callback_value())
+                # line 7 : current ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+                _current = self.get_current()
+                self._draw_text(draw, 0, 7, "Curnt")
+                if _current < self._max_current:
+                    self._draw_text(draw, self._margin_x_figure, 7, " {:5.2f}A".format(_current))
+                    self._draw_bar(draw, 7, ( _current / self._max_current * 100.0) )
                 else:
-                    self._draw_text(draw, 0, 9, self.get_timestamp())
+                    self._draw_bar_full(draw, 7)
+
+                # line 8 : IP address  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+                self._draw_text(draw, 0, 8, self.get_ip(self._network_interface_name))
+    
+                # line 9 : uptime ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+                self._draw_text(draw, 0, 9, self.get_uptime())
+    
+#               # line 9 : timestamp or callback ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+#               if self._permit_callback and self.__callback is not None:
+#                   self._draw_text(draw, 0, 9, self.get_callback_value())
+#               else:
+#                   self._draw_text(draw, 0, 9, self.get_timestamp())
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):

@@ -41,7 +41,8 @@ from core.cardinal import Cardinal
 from core.convert import Convert
 from hardware.color import Color
 from hardware.rgbmatrix import RgbMatrix
-from hardware.sound import Player, Sound
+from hardware.sound import Sound
+from hardware.player import Player
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class BNO055:

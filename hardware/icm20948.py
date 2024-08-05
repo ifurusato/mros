@@ -34,7 +34,8 @@ from core.config_loader import ConfigLoader
 from hardware.i2c_scanner import I2CScanner, DeviceNotFound
 from hardware.digital_pot import DigitalPotentiometer
 from hardware.rgbmatrix import RgbMatrix, DisplayType
-from hardware.sound import Player, Sound
+from hardware.sound import Sound
+from hardware.player import Player
 
 IN_MIN  = 0.0  # minimum analog value from IO Expander
 IN_MAX  = 3.3  # maximum analog value from IO Expander
@@ -93,7 +94,7 @@ class Icm20948(Component):
             self._digital_pot = self._component_registry.get('digital-pot-0x0E')
             if self._digital_pot:
                 self._digital_pot.set_output_range(OUT_MIN, OUT_MAX)
-#           _i2c_scanner = I2CScanner(config, level)
+#           _i2c_scanner = I2CScanner(config, level=level)
 #           if _i2c_scanner.has_hex_address(['0x0E']):
 #               self._log.info('using digital potentiometer…')
 #               self._digital_pot = DigitalPotentiometer(config, level=level)

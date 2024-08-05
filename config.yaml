@@ -8,7 +8,7 @@
 
 krosd:
     application:                          'kros'           # the application to start via daemon ('kros')
-    toggle_pin:                              12            # the GPIO pin connected to the 'enable' toggle switch
+    toggle_pin:                              10            # Rx=8, Tx=10; the GPIO pin connected to the 'enable' toggle switch
 
 mros:
     arguments:                                             # CLI arguments are copied here
@@ -44,19 +44,23 @@ mros:
         radar:                                             # RCWL-0516 Microwave Radar Motion Sensor
             i2c_address:                   0x19            # I²C address for the device
             pin:                              9            # the IO Expander pin used for the analog pot
-        analog_potentiometer:                              # IO Expander-based analog potentiometer
-            i2c_address:                   0x18            # I²C address for the device
-            adc_pin:                         10            # the IO Expander pin used for the analog pot
+        rotated:                                           # IR sensor over SAFT servo to determine if rotated
+            i2c_address:                   0x18            # I2C address of aft IO Expander
+            pin:                              7            # the IO Expander pin used for the analog pot
+            threshold:                      2.0            # threshold of the IR sensor to determine a reflection
+#       analog_potentiometer:                              # IO Expander-based analog potentiometer
+#           i2c_address:                   0x18            # I²C address for the device
+#           adc_pin:                         10            # the IO Expander pin used for the analog pot
         digital_potentiometer:                             # IO Expander-based RGB Potentiometer board
             i2c_address:                   0x0E            # I²C address for the device
             brightness:                     1.0            # brightness of the RGB LED (0.0-1.0)
             pin_red:                          1            # red pin
             pin_green:                        7            # green pin
             pin_blue:                         2            # blue pin
-        push_button:                                       # GPIO or IO Expander-based simple pushbutton
-            i2c_address:                   0x18            # I2C address of the IO Expander
-            source:                        'ioe'           # either 'gpio' or 'ioe'
-            pin:                             13            # the GPIO or IO Expander pin used
+#       push_button:                                       # GPIO or IO Expander-based simple pushbutton
+#           i2c_address:                   0x18            # I2C address of the IO Expander
+#           source:                        'ioe'           # either 'gpio' or 'ioe'
+#           pin:                             13            # the GPIO or IO Expander pin used
         ina260:
             i2c_address:                   0x41            # I2C address (default 0x40)
         bno055:
@@ -249,7 +253,7 @@ mros:
 #               MAXIMUM:                     90.0
     publisher:
         system:
-            publish_delay_sec:               10.0          # publishing delay loop
+            publish_delay_sec:               30.0          # publishing delay loop
             current_threshold:                6.0          # alarm over current
             voltage_threshold:               16.0          # alarm under voltage
         remote:
@@ -265,12 +269,12 @@ mros:
             divider:                         60            # divider for IRQ ticks (@20Hz, 60 = 3s)
         queue:
             loop_freq_hz:                    20            # polling loop frequency (Hz)
-        sensor_array: # note: these are IO Expander pins, not RPi pins
+        sensor_array: # note: these are Fore IO Expander pins, not RPi pins
             fwd_i2c_address:               0x19            # I2C address of forward IO Expander
             aft_i2c_address:               0x18            # I2C address of aft IO Expander
             loop_freq_hz:                    20            # main loop delay in hz
             bsb_pin:                          1            # 1 bumper starboard bottom
-            bst_pin:                          2            # 2 bumper starboard top
+            bst_pin:                          5            # 2 bumper starboard top (was 2)
             bpb_pin:                          3            # 3 bumper port bottom
             bpt_pin:                          4            # 4 bumper port top
             fop_pin:                          7            # 7 fore oblique port IR distance sensor
@@ -279,7 +283,7 @@ mros:
             wsf_pin:                         12            # 12 wheel starboard fore
             wpa_pin:                         13            # 13 wheel port aft
             wpf_pin:                         14            # 14 wheel starboard fore
-            mast_pin:                        10            # IOE pin connected to mast IR (aft IOE)
+            mast_pin:                         8            # IOE pin connected to mast IR (aft IOE)
             oblique_trigger_cm:              20            # min distance trigger oblique IR
         gamepad:
             publish_delay_sec:                0.001        #

@@ -110,7 +110,7 @@ class Matrices(object):
         '''
         Turns the lights on, i.e., enables all LEDs in each matrix.
         '''
-        self._log.debug('matrix on…')
+#       self._log.debug('matrix on…')
         if self._port_matrix:
             self._port_matrix.on()
         if self._stbd_matrix:
@@ -124,7 +124,7 @@ class Matrices(object):
 
         :param rows:     determines the number of rows to be lit
         '''
-        self._log.debug('vertical gradient…')
+#       self._log.debug('vertical gradient…')
         if self._port_matrix:
             self._port_matrix.gradient(rows, -1)
         if self._stbd_matrix:
@@ -183,7 +183,7 @@ class Matrices(object):
 
         :param cols:     determines the number of columns to be lit
         '''
-        self._log.debug('horizontal gradient…')
+#       self._log.debug('horizontal gradient…')
         if self._port_matrix:
             self._port_matrix.gradient(-1, cols)
         if self._stbd_matrix:
@@ -234,14 +234,14 @@ class Matrices(object):
         Wipe LEFT is not yet implemented.
         '''
         if direction is Matrices.RIGHT:
-            self._log.info('matrix horizontal wipe right {}…'.format('on' if enable else 'off'))
+#           self._log.debug('matrix horizontal wipe right {}…'.format('on' if enable else 'off'))
             r = [ 1, 12, 1 ] if enable else [10, 0, -1]
         else:
-            self._log.info('matrix horizontal wipe left {}…'.format('on' if enable else 'off'))
+#           self._log.debug('matrix horizontal wipe left {}…'.format('on' if enable else 'off'))
             raise NotImplementedError()
-        self._log.info(Fore.WHITE + '🍄 configured matrix horizontal wipe left on r[0]: {:d}; r[1]: {:d}; r[2]: {:d}…'.format(r[0], r[1], r[2]))
+#       self._log.debug('configured matrix horizontal wipe left on r[0]: {:d}; r[1]: {:d}; r[2]: {:d}…'.format(r[0], r[1], r[2]))
         for i in range(r[0], r[1], r[2]):
-            self._log.debug('matrix at {:d}'.format(i))
+#           self._log.debug('matrix at {:d}'.format(i))
             if self._port_matrix:
                 self._port_matrix.gradient(-1, i)
             if self._stbd_matrix:
@@ -256,13 +256,13 @@ class Matrices(object):
         Wipe UP is not yet implemented.
         '''
         if direction is Matrices.DOWN:
-            self._log.info('matrix vertical wipe down {}…'.format('on' if enable else 'off'))
+#           self._log.info('matrix vertical wipe down {}…'.format('on' if enable else 'off'))
             r = [1, 8, 1] if enable else [7, 0, -1]
         else:
-            self._log.info('matrix vertical wipe up {}…'.format('on' if enable else 'off'))
+#           self._log.info('matrix vertical wipe up {}…'.format('on' if enable else 'off'))
             raise NotImplementedError()
         for i in range(r[0], r[1], r[2]):
-            self._log.debug('matrix at {:d}'.format(i))
+#           self._log.debug('matrix at {:d}'.format(i))
             if self._port_matrix:
                 self._port_matrix.gradient(i, -1)
             if self._stbd_matrix:
@@ -281,7 +281,7 @@ class Matrices(object):
         '''
         Turns the lights off and disables any running threads.
         '''
-        self._log.debug('clear all.')
+#       self._log.debug('clear all.')
         if self._port_matrix:
             self._port_matrix.disable()
             self._port_matrix.clear()
@@ -329,13 +329,13 @@ class Matrix(object):
         true this will continue to scroll until disable() is called.
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.info('no matrix 11x7 display available.')
             return
         elif self._thread is None:
             self._thread = Thread(name='matrix', target=Matrix._text, args=[self, message, is_small_font, is_scrolling])
             self._thread.start()
         else:
-            self._log.debug('thread already running; replacing existing text in buffer.')
+            self._log.warning('thread already running; replacing existing text in buffer.')
             self._matrix11x7.clear()
             if is_small_font:
                 self._matrix11x7.write_string(message, y=1, font=font3x5)
@@ -384,7 +384,7 @@ class Matrix(object):
         Turn on a single column of the LEDs at maximum brightness.
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.debug('no matrix 11x7 display available.')
             return
         if col < 0 or col > 10:
             raise ValueError('column argument \'{:d}\' out of range (0-10)'.format(col))
@@ -406,7 +406,7 @@ class Matrix(object):
         Gradually turn on all of the LEDs to maximum brightness.
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.debug('no matrix 11x7 display available.')
             return
         for b in Util.frange(0.0, 1.0, 0.005):
             for x in range(0, self._matrix11x7.width):
@@ -423,7 +423,7 @@ class Matrix(object):
         Gradually turn off all of the LEDs.
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.debug('no matrix 11x7 display available.')
             return
         for b in Util.frange(1.0, 0.0, -0.005):
             for x in range(0, self._matrix11x7.width):
@@ -445,7 +445,7 @@ class Matrix(object):
         :param cols:     determines how many columns to light (1-11)
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.debug('no matrix 11x7 display available.')
             return
         _rows = min(self._matrix11x7.height, rows) if rows >= 0 else self._matrix11x7.height
         _cols = min(self._matrix11x7.width, cols) if cols >= 0 else self._matrix11x7.width
@@ -466,12 +466,12 @@ class Matrix(object):
         at maximum brightness.
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.debug('no matrix 11x7 display available.')
             return
         elif self._thread is not None:
             self._log.warning('cannot continue: text thread is currently running.')
             return
-        self._log.debug('matrix display ({},{})'.format(rows, cols))
+#       self._log.debug('matrix display ({},{})'.format(rows, cols))
         self._enabled = True
         self._matrix11x7.set_brightness(1.0)
         self.clear(False)
@@ -491,7 +491,7 @@ class Matrix(object):
         Turn off all LEDs. If 'show' is True (default) then show the change.
         '''
         if not self._matrix11x7:
-            self._log.debug('no matrix 11x7 display available.')
+#           self._log.debug('no matrix 11x7 display available.')
             return
         self._matrix11x7.set_brightness(0.5)
         for x in range(0, self._matrix11x7.width):

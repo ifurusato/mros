@@ -63,6 +63,7 @@ class RemoteControlPublisher(Publisher):
                 + Fore.RED   + ' d0={:d};'.format(self._d0_pin) \
                 + Fore.BLUE  + ' d1={:d};'.format(self._d1_pin) \
                 + Fore.GREEN + ' d2={:d}'.format(self._d2_pin))
+        self._last_event = Event.NOOP
         self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -100,7 +101,6 @@ class RemoteControlPublisher(Publisher):
     async def _remote_listener_loop(self, f_is_enabled):
         self._log.info('starting bumper listener loop.')
         # initial throwaway message
-        _last_event = self.message_factory.create_message(self._events[0], None).event
         while f_is_enabled():
             _count = next(self._counter)
             _value   = None
@@ -109,13 +109,14 @@ class RemoteControlPublisher(Publisher):
             _index = int('{}{}{}'.format(self._pi.read(self._d2_pin), self._pi.read(self._d1_pin), self._pi.read(self._d0_pin)), 2)
             # when this starts up it will create a zero unrelated to an actual event
             _message = self.message_factory.create_message(self._events[_index], _value)
-            if _message is not None:
+            if _index > 0 and _count > 0 and self._last_event.num != _event.num: # throw out initial messages
                 _event = _message.event
-                if _event != _last_event: # throw out initial message
+                if _event.num != self._last_event.num:
+                    self._log.info('🍈 remote publish count: {}; index bin: {}; index: {}'.format(_count, _index_bin, _index))
                     self._log.info(Style.BRIGHT + 'remote-publishing message:' + Fore.WHITE + Style.NORMAL + ' {}'.format(_message.name)
                             + Fore.CYAN + ' event: {}; '.format(_message.event.name) + Fore.YELLOW + 'timestamp: {}'.format(_message.value))
                     await Publisher.publish(self, _message)
-                _last_event = _event
+                self._last_event = _event
             await asyncio.sleep(self._publish_delay_sec)
         self._log.info('remote publish loop complete.')
 

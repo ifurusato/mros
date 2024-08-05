@@ -85,7 +85,7 @@ def test_servos():
 #       _min_value = -1 * (Servo.MAX_RANGE / 2)
 #       _max_value = Servo.MAX_RANGE / 2
 
-        _i2c_scanner = I2CScanner(_config, _level)
+        _i2c_scanner = I2CScanner(_config, level=_level)
         if _i2c_scanner.has_hex_address(['0x0E']):
             _log.info('using digital potentiometer...')
             _pot = DigitalPotentiometer(_config, level=_level)

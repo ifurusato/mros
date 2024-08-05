@@ -175,7 +175,6 @@ class ServoController(Component):
             angle = int(angle)
         _start_time = dt.now()
         _current_angle = int(servo.angle)
-        self._log.info(Fore.MAGENTA + 'set_rotate: servo {} angle {:d}°; to: {:d}°'.format(servo.name, _current_angle, angle))
         if _current_angle == angle:
             # no change
             pass
@@ -189,10 +188,8 @@ class ServoController(Component):
             for a in range(_current_angle, angle):
                 servo.angle = a
                 time.sleep(ServoController.ROTATION_DELAY_MS / 1000)
-            self._log.info('servo {} rotate complete.'.format(servo.name))
-        self._log.info(Fore.MAGENTA + 'AFTER: set_rotate: servo {} angle {:d}°; from: {:d}°'.format(servo.name, int(servo.angle), angle))
         _elapsed_ms = round(( dt.now() - _start_time ).total_seconds() * 1000.0)
-        self._log.info(Fore.YELLOW + 'set rotate complete: elapsed: {:d}ms'.format(_elapsed_ms))
+#       self._log.info('set rotate complete: elapsed: {:d}ms'.format(_elapsed_ms))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_rotate_mode_for_servo(self, orientation):
@@ -344,21 +341,21 @@ class ServoController(Component):
         '''
         try:
             _angle = int(servo.adjusted_angle)
-            self._log.info(Fore.MAGENTA + 'starting angle of servo {}: {:d}°'.format(servo.name, _angle))
+#           self._log.info(Fore.MAGENTA + 'starting angle of servo {}: {:d}°'.format(servo.name, _angle))
             if _angle == 0:
                 self._log.info('servo {} is centered.'.format(servo.name))
             elif _angle > 0:
-                self._log.info('recentering servo {} from {:d} to {:d}… (-) [current: {:d}]'.format(servo.name, _angle, 0, servo.adjusted_angle))
+#               self._log.debug('recentering servo {} from {:d} to {:d}… (-) [current: {:d}]'.format(servo.name, _angle, 0, servo.adjusted_angle))
                 for a in range(_angle, 0, -1):
                     servo.angle = a
                     time.sleep(ServoController.ROTATION_DELAY_MS / 1000)
-                self._log.info('recentered {} servo.'.format(servo.name))
+                self._log.debug('recentered {} servo.'.format(servo.name))
             elif _angle < 0:
-                self._log.info('recentering servo {} from {:d} to {:d}… (+) [current: {:d}]'.format(servo.name, _angle, 0, servo.adjusted_angle))
+#               self._log.debug('recentering servo {} from {:d} to {:d}… (+) [current: {:d}]'.format(servo.name, _angle, 0, servo.adjusted_angle))
                 for a in range(_angle, 0):
                     servo.angle = a
                     time.sleep(ServoController.ROTATION_DELAY_MS / 1000)
-                self._log.info('recentered {} servo.'.format(servo.name))
+                self._log.debug('recentered {} servo.'.format(servo.name))
             if close_upon_completion:
                 servo.disable()
         except Exception as e:

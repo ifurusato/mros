@@ -68,9 +68,10 @@ from hardware.digital_pot import DigitalPotentiometer
 from hardware.monitor import Monitor
 from hardware.irq_clock import IrqClock
 from hardware.motion_controller import MotionController
-from hardware.sound import Player, Sound
+from hardware.sound import Sound
+from hardware.player import Player
 #from hardware.status import Status
-from hardware.indicator import Indicator
+#from hardware.indicator import Indicator
 
 #from mock.event_publisher import EventPublisher
 #from mock.velocity_publisher import VelocityPublisher
@@ -259,7 +260,7 @@ class MROS(Component, FiniteStateMachine):
 
         # LED on mast
         _pin = 13 # TODO get from config
-        self._status_light = Indicator(_pin, Level.INFO)
+#       self._status_light = Indicator(_pin, Level.INFO)
         # TFT screen
         self._screen = Screen(self._config, Level.INFO)
 
@@ -419,7 +420,7 @@ class MROS(Component, FiniteStateMachine):
         FiniteStateMachine.start(self)
 
 #       self._screen.disable()
-        self._status_light.enable()
+#       self._status_light.enable()
 
         self._disable_leds = self._config['pi'].get('disable_leds')
         if self._disable_leds:

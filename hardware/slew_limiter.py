@@ -49,7 +49,7 @@ class SlewLimiter(Component):
         self._log.info('hysteresis:\t{:5.2f}'.format(self._slew_hysteresis))
         self._stats_queue       = None
         self._last_time         = self._millis()
-        self._verbose           = False # TEMP
+        self._verbose           = False
         # temporary ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._min = 0.0
         self._max = 0.0
@@ -69,7 +69,7 @@ class SlewLimiter(Component):
         Reset the slew rate to the default value provided in the configuration.
         '''
         self._slew_rate = self._default_slew_rate
-        self._log.info('slew rate limit reset to default of {}; {:>6.4f}/cycle.'.format(self._slew_rate.label, self._slew_rate.limit))
+#       self._log.info('slew rate limit reset to default of {}; {:>6.4f}/cycle.'.format(self._slew_rate.label, self._slew_rate.limit))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -91,7 +91,7 @@ class SlewLimiter(Component):
             raise ValueError('expected SlewRate argument, not {}'.format(type(slew_rate)))
         self._slew_rate = slew_rate
         self._rate_limit = slew_rate.limit
-        self._log.info('🍄 slew rate limit set to {}; {:>6.4f}/cycle.'.format(slew_rate.label, self._slew_rate.limit))
+#       self._log.info('slew rate limit set to {}; {:>6.4f}/cycle.'.format(slew_rate.label, self._slew_rate.limit))
 
     def set_slew_rate_limit(self, limit):
         self._rate_limit = limit
@@ -109,17 +109,15 @@ class SlewLimiter(Component):
         Next generation attempt.
         '''
         if not self.is_active:
-            self._log.info('🐟 slew limiter not active.')
+            self._log.warning('slew limiter not active.')
             return target_value
         _value = target_value
 
         _now = self._millis()
         _elapsed = _now - self._last_time
 
-#       self._rate_limit = 0.0005 # 0.0001 to 0.1
-
 #       elif isclose(target_value, current_value, abs_tol=1e-3):
-#           self._log.info('🐟 slew limiter: target is close to current value.')
+#           self._log.info('slew limiter: target is close to current value.')
 #           return target_value
         if target_value > current_value: # increasing ┈┈┈┈
             # add a percentage of difference between current and target to current
