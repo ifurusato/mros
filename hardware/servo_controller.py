@@ -29,15 +29,14 @@ from core.orientation import Orientation
 from core.rate import Rate
 from core.steering_mode import SteeringMode
 from core.message import Message, Payload
+from hardware.rotated import Rotated
 from hardware.servo import Servo
 from hardware.slew_rate import SlewRate
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class ServoController(Component):
-    USE_THREADING          = True
     USE_THREADING_FOR_AFRS = False
     RECENTER_USE_LOOP      = False
-    RECENTER_USE_THREADING = True
     SLOW_RECENTER_ON_CLOSE = True
     ROTATION_DELAY_MS      = 50
     '''
@@ -68,6 +67,8 @@ class ServoController(Component):
         self._paft_servo = Servo(_cfg, Orientation.PAFT, True, level)
         self._saft_servo = Servo(_cfg, Orientation.SAFT, True, level)
         self._all_servos = self._get_servos()
+        # rotated sensor on SAFT assembly
+        self._rotated = Rotated(config, level=level)
         # default mode
         self._steering_mode = None
         self.set_mode(SteeringMode.SKID)
@@ -136,22 +137,21 @@ class ServoController(Component):
             raise Exception('unsupported orientation.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_mode(self, steering_mode, initial_delay=0.0):
+    def set_mode(self, steering_mode, callback=None):
         '''
         Sets the angles of the servos according to the steering mode. These
         are all fixed angles.
         '''
-        if initial_delay > 0.0:
-            time.sleep(initial_delay)
         if steering_mode is None:
             raise ValueError('null steering mode argument.')
         elif steering_mode is SteeringMode.ACKERMANN:
             raise Exception('unsupported steering mode: {}'.format(steering_mode.name))
         elif steering_mode is SteeringMode.SKID:
             self._steering_mode = SteeringMode.SKID
-            self.recenter(False)
+            self.recenter(callback=callback)
         elif steering_mode is SteeringMode.AFRS:
             self._steering_mode = SteeringMode.AFRS
+            self.recenter(callback=callback)
             pass
         elif steering_mode is SteeringMode.OMNIDIRECTIONAL:
             raise Exception('unsupported steering mode: {}'.format(steering_mode.name))
@@ -159,7 +159,7 @@ class ServoController(Component):
             raise Exception('unsupported steering mode: {}'.format(steering_mode.name))
         elif steering_mode is SteeringMode.ROTATE:
             self._steering_mode = SteeringMode.ROTATE
-            self.set_rotate_mode()
+            self.set_rotate_mode(callback)
         elif steering_mode is SteeringMode.FORWARD_PIVOT:
             raise Exception('unsupported steering mode: {}'.format(steering_mode.name))
         elif steering_mode is SteeringMode.AFT_PIVOT:
@@ -204,27 +204,38 @@ class ServoController(Component):
         _thread.start()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def set_rotate_mode(self):
-        if ServoController.USE_THREADING:
-            _t_pfwd = Thread(target = self._set_rotate, args=[self._pfwd_servo, -1 * self._rotate_angle], name='rotate_pfwd', daemon=self._is_daemon)
-            _t_sfwd = Thread(target = self._set_rotate, args=[self._sfwd_servo, self._rotate_angle], name='rotate_sfwd', daemon=self._is_daemon)
-#           _t_pmid = Thread(target = self._set_rotate, args=[self._pmid_servo, 0], name='rotate_pmid', daemon=self._is_daemon)
-#           _t_smid = Thread(target = self._set_rotate, args=[self._smid_servo, 0], name='rotate_smid', daemon=self._is_daemon)
-            _t_paft = Thread(target = self._set_rotate, args=[self._paft_servo, self._rotate_angle], name='rotate_paft', daemon=self._is_daemon)
-            _t_saft = Thread(target = self._set_rotate, args=[self._saft_servo, -1 * self._rotate_angle], name='rotate_saft', daemon=self._is_daemon)
-            _t_pfwd.start()
-            _t_sfwd.start()
-#           _t_pmid.start()
-#           _t_smid.start()
-            _t_paft.start()
-            _t_saft.start()
-        else:
-            self._pfwd_servo.angle = -1 * self._rotate_angle
-            self._sfwd_servo.angle = self._rotate_angle
-#           self._pmid_servo.angle = 0
-#           self._smid_servo.angle = 0
-            self._paft_servo.angle = self._rotate_angle
-            self._saft_servo.angle = -1 * self._rotate_angle
+    @property
+    def is_rotated(self):
+        '''
+        Returns true if the IR sensor indicates the SAFT steering is in a
+        rotated state. This assumes that the other three servos are in the
+        same state.
+        '''
+        return self._rotated.is_rotated()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_rotate_mode(self, callback):
+        '''
+        Sets the angles for each of the steering servos to match the rotation
+        mode, executing the callback once finished.
+        '''
+        _threads = [
+                Thread(target = self._set_rotate, args=[self._pfwd_servo, -1 * self._rotate_angle], name='rotate_pfwd', daemon=self._is_daemon),
+                Thread(target = self._set_rotate, args=[self._sfwd_servo, self._rotate_angle], name='rotate_sfwd', daemon=self._is_daemon),
+#               Thread(target = self._set_rotate, args=[self._pmid_servo, 0], name='rotate_pmid', daemon=self._is_daemon),
+#               Thread(target = self._set_rotate, args=[self._smid_servo, 0], name='rotate_smid', daemon=self._is_daemon),
+                Thread(target = self._set_rotate, args=[self._paft_servo, self._rotate_angle], name='rotate_paft', daemon=self._is_daemon),
+                Thread(target = self._set_rotate, args=[self._saft_servo, -1 * self._rotate_angle], name='rotate_saft', daemon=self._is_daemon)
+            ]
+        # start all threads
+        for _thread in _threads:
+            _thread.start()
+        # wait til all threads have finished
+        for _thread in _threads:
+            _thread.join()
+        while not self.is_rotated:
+            self._log.info(Style.DIM + 'waiting to rotate servos…')
+            time.sleep(0.1)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_omnidirectional_angle(self, angle):
@@ -233,26 +244,20 @@ class ServoController(Component):
         '''
         _angle = angle #int(angle * Servo.SCALE_FACTOR)
         self._log.info(Fore.BLACK + 'set servo positions to {:.2f}° (called with {:.2f}°)'.format(_angle, angle))
-        if ServoController.USE_THREADING:
-            _t_pfwd = Thread(target = self._pfwd_servo.set_angle, args=[_angle], name='set_pfwd', daemon=self._is_daemon)
-            _t_sfwd = Thread(target = self._sfwd_servo.set_angle, args=[_angle], name='set_sfwd', daemon=self._is_daemon)
-#           _t_pmid = Thread(target = self._pmid_servo.set_angle, args=[_angle], name='set_pmid', daemon=self._is_daemon)
-#           _t_smid = Thread(target = self._smid_servo.set_angle, args=[_angle], name='set_smid', daemon=self._is_daemon)
-            _t_paft = Thread(target = self._paft_servo.set_angle, args=[_angle], name='set_paft', daemon=self._is_daemon)
-            _t_saft = Thread(target = self._saft_servo.set_angle, args=[_angle], name='set_saft', daemon=self._is_daemon)
-            _t_pfwd.start()
-            _t_sfwd.start()
-#           _t_pmid.start()
-#           _t_smid.start()
-            _t_paft.start()
-            _t_saft.start()
-        else:
-            self._pfwd_servo.angle = _angle
-            self._sfwd_servo.angle = _angle
-#           self._pmid_servo.angle = _angle
-#           self._smid_servo.angle = _angle
-            self._paft_servo.angle = _angle
-            self._saft_servo.angle = _angle
+        _threads = [
+                Thread(target = self._pfwd_servo.set_angle, args=[_angle], name='set_pfwd', daemon=self._is_daemon),
+                Thread(target = self._sfwd_servo.set_angle, args=[_angle], name='set_sfwd', daemon=self._is_daemon),
+#               Thread(target = self._pmid_servo.set_angle, args=[_angle], name='set_pmid', daemon=self._is_daemon),
+#               Thread(target = self._smid_servo.set_angle, args=[_angle], name='set_smid', daemon=self._is_daemon),
+                Thread(target = self._paft_servo.set_angle, args=[_angle], name='set_paft', daemon=self._is_daemon),
+                Thread(target = self._saft_servo.set_angle, args=[_angle], name='set_saft', daemon=self._is_daemon)
+            ]
+        # start all threads
+        for _thread in _threads:
+            _thread.start()
+        # wait til all threads have finished
+        for _thread in _threads:
+            _thread.join()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_afrs_angle(self, port_angle, stbd_angle):
@@ -263,35 +268,22 @@ class ServoController(Component):
         Negative values turn towards starboard (clockwise), port is the outer side.
         '''
         self._log.info('set afrs servo to: ' + Fore.RED + 'port: {}°; '.format(port_angle) + Fore.GREEN + 'stbd {}°'.format(stbd_angle))
-#       if self._afrs_angle < 0: # if negative, stbd is inner, port is outer
-#           port_angle = self._afrs_angle
-#           stbd_angle = self._opposite_afrs_angle
-#       else: # if positive, port is inner, stbd is outer (zero is same)
-#           port_angle = self._opposite_afrs_angle
-#           stbd_angle = -1 * self._afrs_angle
         if port_angle < 0:
             stbd_angle = -1 * stbd_angle
-
-        if ServoController.USE_THREADING_FOR_AFRS:
-            _t_pfwd = Thread(target = self._pfwd_servo.set_angle, args=[-1 * port_angle], name='set_pfwd', daemon=self._is_daemon)
-            _t_sfwd = Thread(target = self._sfwd_servo.set_angle, args=[stbd_angle], name='set_sfwd', daemon=self._is_daemon)
-#           _t_pmid = Thread(target = self._pmid_servo.set_angle, args=[0], name='set_pmid', daemon=self._is_daemon)
-#           _t_smid = Thread(target = self._smid_servo.set_angle, args=[0], name='set_smid', daemon=self._is_daemon)
-            _t_paft = Thread(target = self._paft_servo.set_angle, args=[port_angle], name='set_paft', daemon=self._is_daemon)
-            _t_saft = Thread(target = self._saft_servo.set_angle, args=[-1 * stbd_angle], name='set_saft', daemon=self._is_daemon)
-            _t_pfwd.start()
-            _t_sfwd.start()
-#           _t_pmid.start()
-#           _t_smid.start()
-            _t_paft.start()
-            _t_saft.start()
-        else:
-            self._pfwd_servo.angle = -1 * port_angle
-            self._sfwd_servo.angle = -1 * stbd_angle
-#           self._pmid_servo.angle = 0
-#           self._smid_servo.angle = 0
-            self._paft_servo.angle = port_angle
-            self._saft_servo.angle = stbd_angle
+        _threads = [
+                Thread(target = self._pfwd_servo.set_angle, args=[-1 * port_angle], name='set_pfwd', daemon=self._is_daemon),
+                Thread(target = self._sfwd_servo.set_angle, args=[-1 * stbd_angle], name='set_sfwd', daemon=self._is_daemon),
+#               Thread(target = self._pmid_servo.set_angle, args=[0], name='set_pmid', daemon=self._is_daemon),
+#               Thread(target = self._smid_servo.set_angle, args=[0], name='set_smid', daemon=self._is_daemon),
+                Thread(target = self._paft_servo.set_angle, args=[port_angle], name='set_paft', daemon=self._is_daemon),
+                Thread(target = self._saft_servo.set_angle, args=[stbd_angle], name='set_saft', daemon=self._is_daemon)
+            ]
+        # start all threads
+        for _thread in _threads:
+            _thread.start()
+        # wait til all threads have finished
+        for _thread in _threads:
+            _thread.join()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_angle(self, orientation, angle):
@@ -331,19 +323,82 @@ class ServoController(Component):
             for _servo in self._all_servos:
                 if _servo:
                     _servo.enable()
-            self.recenter(False)
+            self.recenter()
             self._log.info('enabled.')
 
+
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _recenter(self, servo, close_upon_completion):
+    def _recenter_on_close(self):
+        '''
+        Recenters all servos, blocking until they're finished.
+        '''
+        _count = 0
+        self.recenter(close_upon_completion=True)
+        while _count < 30 and not self.all_disabled():
+            _count += 1
+            self._log.info(Style.DIM + '[{:02d}] recentering servos…'.format(_count))
+            time.sleep(0.2)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _rotation_completion_callback(self, servo_ids, servo_id):
+        self._log.info(Style.DIM + 'rotation complete on {} servo.'.format(servo_id.name))
+        servo_ids.remove(servo_id)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def recenter(self, callback=None, timeout_sec=4, close_upon_completion=False):
+        '''
+        Slowly recenters the servos. The callback is executed upon completion.
+
+        :param callback:  called upon completion of the action
+        :param close_upon_completion:  if False (setting 'is_daemon' to True),
+                                       this will block application exit until
+                                       completed.
+        '''
+        if self.closed:
+            return
+        _servo_ids = [Orientation.PFWD, Orientation.SFWD, Orientation.PAFT, Orientation.SAFT]
+        # if close upon completion we want non-daemonic threads so they complete
+        _start_time = time.perf_counter()
+        _is_daemon = not close_upon_completion
+        _threads = [
+                Thread(target = self._recenter, args=[self._pfwd_servo, self._rotation_completion_callback(_servo_ids, Orientation.PFWD), close_upon_completion], 
+                        name='recenter_pfwd', daemon=_is_daemon),
+                Thread(target = self._recenter, args=[self._sfwd_servo, self._rotation_completion_callback(_servo_ids, Orientation.SFWD), close_upon_completion], 
+                        name='recenter_sfwd', daemon=_is_daemon),
+#               Thread(target = self._recenter, args=[self._pmid_servo, self._rotation_completion_callback(_servo_ids, Orientation.PMID), close_upon_completion], 
+#                       name='recenter_pmid', daemon=_is_daemon),
+#               Thread(target = self._recenter, args=[self._smid_servo, self._rotation_completion_callback(_servo_ids, Orientation.SMID), close_upon_completion], 
+#                       name='recenter_smid', daemon=_is_daemon),
+                Thread(target = self._recenter, args=[self._paft_servo, self._rotation_completion_callback(_servo_ids, Orientation.PAFT), close_upon_completion], 
+                        name='recenter_paft', daemon=_is_daemon),
+                Thread(target = self._recenter, args=[self._saft_servo, self._rotation_completion_callback(_servo_ids, Orientation.SAFT), close_upon_completion], 
+                        name='recenter_saft', daemon=_is_daemon)
+            ]
+        # start all threads
+        for _thread in _threads:
+            _thread.start()
+        # wait til all threads have finished
+        for _thread in _threads:
+            _thread.join()
+        # when all servos have called back, we're prior the timeout, and rotated is False
+        while len(_servo_ids) > 0 and (time.perf_counter() - _start_time < timeout_sec) and not self.is_rotated:
+            self._log.info(Style.DIM + 'waiting to recenter servos…')
+            time.sleep(0.1)
+        if callback is not None:
+            self._log.info(Style.DIM + 'calling recenter callback…')
+            callback()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _recenter(self, servo, callback=None, close_upon_completion=False):
         '''
         Slowly recenters the servo. This is suitable for being called by a Thread.
         '''
         try:
             _angle = int(servo.adjusted_angle)
+            self._log.info(Style.DIM + 'recentering servo {} with adjusted_angle of {}'.format(servo.name, servo.adjusted_angle))
 #           self._log.info(Fore.MAGENTA + 'starting angle of servo {}: {:d}°'.format(servo.name, _angle))
             if _angle == 0:
-                self._log.info('servo {} is centered.'.format(servo.name))
+                self._log.info('servo {} is centered at 0.'.format(servo.name))
             elif _angle > 0:
 #               self._log.debug('recentering servo {} from {:d} to {:d}… (-) [current: {:d}]'.format(servo.name, _angle, 0, servo.adjusted_angle))
                 for a in range(_angle, 0, -1):
@@ -362,56 +417,8 @@ class ServoController(Component):
             self._log.error('{} encountered while recentering: {}\n{}'.format(type(e), e, traceback.format_exc())) 
         finally:
             servo.angle = 0
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _recenter_on_close(self):
-        '''
-        Recenters all servos, blocking until they're finished.
-        '''
-        _count = 0
-        self.recenter(True)
-        while _count < 30 and not self.all_disabled():
-            _count += 1
-            self._log.info(Style.DIM + '[{:02d}] recentering servos…'.format(_count))
-            time.sleep(0.2)
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def recenter(self, close_upon_completion=False):
-        '''
-        Slowly recenters the servos. if 'is_daemon' is True, will block
-        application exit until completed.
-        '''
-        if self.closed:
-            return
-        if ServoController.RECENTER_USE_THREADING:
-            # if close upon completion we want non-daemonic threads so they complete
-            _is_daemon = not close_upon_completion
-            _t_pfwd = Thread(target = self._recenter, args=[self._pfwd_servo, close_upon_completion], name='recenter_pfwd', daemon=_is_daemon)
-            _t_sfwd = Thread(target = self._recenter, args=[self._sfwd_servo, close_upon_completion], name='recenter_sfwd', daemon=_is_daemon)
-#           _t_pmid = Thread(target = self._recenter, args=[self._pmid_servo, close_upon_completion], name='recenter_pmid', daemon=_is_daemon)
-#           _t_smid = Thread(target = self._recenter, args=[self._smid_servo, close_upon_completion], name='recenter_smid', daemon=_is_daemon)
-            _t_paft = Thread(target = self._recenter, args=[self._paft_servo, close_upon_completion], name='recenter_paft', daemon=_is_daemon)
-            _t_saft = Thread(target = self._recenter, args=[self._saft_servo, close_upon_completion], name='recenter_saft', daemon=_is_daemon)
-            _t_pfwd.start()
-            _t_sfwd.start()
-#           _t_pmid.start()
-#           _t_smid.start()
-            _t_paft.start()
-            _t_saft.start()
-        elif ServoController.RECENTER_USE_LOOP:
-            self._recenter(self._pfwd_servo)
-            self._recenter(self._sfwd_servo)
-#           self._recenter(self._pmid_servo)
-#           self._recenter(self._smid_servo)
-            self._recenter(self._paft_servo)
-            self._recenter(self._saft_servo)
-        else:
-            self._pfwd_servo.angle = 0
-            self._sfwd_servo.angle = 0
-#           self._pmid_servo.angle = 0
-#           self._smid_servo.angle = 0
-            self._paft_servo.angle = 0
-            self._saft_servo.angle = 0
+            if callback is not None:
+                callback()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def all_disabled(self):

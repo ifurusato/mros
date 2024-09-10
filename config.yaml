@@ -6,8 +6,8 @@
 #       YAML configuration for M-Series Robot Operating System (MROS)
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
-krosd:
-    application:                          'kros'           # the application to start via daemon ('kros')
+mrosd:
+    application:                          'mros'           # the application to start via daemon ('mros')
     toggle_pin:                              10            # Rx=8, Tx=10; the GPIO pin connected to the 'enable' toggle switch
 
 mros:
@@ -15,10 +15,12 @@ mros:
         nada:                             False            # nada
     use_external_clock:                    True            # if True use external clock, ignoring loop delay value
     use_slow_external_clock:               True            # if True use the slow (5Hz) external clock
+    initial_calibration:                  False            # if True, calibrate the IMU upon starting
+    play_sound:                            True            # if True, play sound to indicate various actions
     enable_monitor:                        True            # if True use OLED display as monitor
     component:
         # publishers .......................................
-        enable_queue_publisher:           False            # publishes from globally-available queue
+        enable_queue_publisher:            True            # publishes from globally-available queue
         enable_system_publisher:           True            # enable System Publisher
         enable_clock_publisher:           False            # enable Clock Publisher
         enable_sensor_array_publisher:     True            # enable SensorArray publisher
@@ -46,7 +48,7 @@ mros:
             pin:                              9            # the IO Expander pin used for the analog pot
         rotated:                                           # IR sensor over SAFT servo to determine if rotated
             i2c_address:                   0x18            # I2C address of aft IO Expander
-            pin:                              7            # the IO Expander pin used for the analog pot
+            pin:                              9            # the IO Expander pin used for the analog pot
             threshold:                      2.0            # threshold of the IR sensor to determine a reflection
 #       analog_potentiometer:                              # IO Expander-based analog potentiometer
 #           i2c_address:                   0x18            # I²C address for the device
@@ -57,10 +59,10 @@ mros:
             pin_red:                          1            # red pin
             pin_green:                        7            # green pin
             pin_blue:                         2            # blue pin
-#       push_button:                                       # GPIO or IO Expander-based simple pushbutton
-#           i2c_address:                   0x18            # I2C address of the IO Expander
-#           source:                        'ioe'           # either 'gpio' or 'ioe'
-#           pin:                             13            # the GPIO or IO Expander pin used
+        push_button:                                       # GPIO or IO Expander-based simple pushbutton
+            i2c_address:                   0x18            # I2C address of the IO Expander
+            source:                       'gpio'           # either 'gpio' or 'ioe'
+            pin:                              8            # the GPIO or IO Expander pin used
         ina260:
             i2c_address:                   0x41            # I2C address (default 0x40)
         bno055:
@@ -75,19 +77,20 @@ mros:
             play_sound:                    True            # if True, play sound to indicate calibration
         icm20948:
             i2c_address:                   0x69            # I2C address (default 0x68)
-            poll_rate_hz:                    50            # how often the IMU is polled
-            bench_calibrate:              False            # if true, calibrate the IMU while on the rotating bench
-            motion_calibrate:             False            # if true, calibrate the IMU by rotating the robot in place
-            show_console:                 False            # if true, show data on console (same as verbose)
+            poll_rate_hz:                   150            # how often the IMU is polled
+            bench_calibrate:               True            # if true, calibrate the IMU manually while on the rotating bench
+            motion_calibrate:             False            # if true, calibrate the IMU by the robot rotating in place
+            show_console:                  True            # if true, show data on console (same as verbose)
             show_rgbmatrix5x5:             True            # if true, show heading as color
             show_rgbmatrix11x7:            True            # if true, show heading as number
             adjust_trim:                  False            # if true, use pot for trim, otherwise used fixed value
             pitch_trim:                    0.0             # pitch trim for level
             roll_trim:                     4.0             # roll trim for level
-            heading_trim:                  0.15            # heading trim adjustment to set north
+            heading_trim:                  0.0             # heading trim adjustment to set north (was 0.15)
             queue_length:                   100            # length of heading data queue
             stability_threshold:              5.0          # max standard deviation to determine stability
-            cardinal_tolerance:       0.0698132            # tolerance to cardinal points (in radians)
+            cardinal_tolerance:               0.0698132    # tolerance to cardinal points (4° in radians)
+#           cardinal_tolerance:               0.0523599    # tolerance to cardinal points (3° in radians)
             include_accel_gyro:            True            # if true, also poll accelerometer and gyroscope data
             play_sound:                    True            # if True, play sound to indicate calibration
         irq_clock:
@@ -95,9 +98,16 @@ mros:
             slow_pin:                        23            # GPIO pin connected to a slow (5Hz) external clock source
             freq_divider:                    50            # tick divisor for lower frequency callback
         monitor:
+            i2c_port:                         0
+            i2c_address:                   0x3C
+            contrast:                      0x7F            # 0x-00-0xFF screen brightness
+            update_rate_hz:                   1            # update rate in Hz
+            use_thread:                   False            # if an external clock is not supplied, use a thread for the update loop
+            rotate:                           1            # values 0: 180°; 1: -90°; 2: 0°; 3: 90°
             permit_callback:               False           # setting True may introduce message timing issues
             font_size:                       10            # main font size
             font_size_full:                   8            # font size for bar
+            font_size_message:               15            # message font size
             font_name:      'Varela-Regular.ttf'           # font family
         gamepad:
             enabled:                       True
@@ -105,14 +115,22 @@ mros:
             loop_delay:                       0.01         # main loop delay was sleep(0.01) or 1/100th second, or 10ms. 50ms is the delay for 20Hz, so 10ms is 5x 20Hz or 100Hz.
             suppress_horiz_events:         True            # ignore horizontal joystick events
             loop_freq_hz:                   100            # polling loop frequency (Hz)
+        tinyfx-controller:
+            i2c_address:                   0x18
+            pin_1:                           11            # pin on the IO Expander
+            pin_2:                           12            # pin on the IO Expander
         rtof:
             enabled:                       True
     motion_controller:
         afrs_max_ratio:                       0.36016      # speed ratio of inner wheels at max turn 
         afrs_max_angle:                      45.0          # maximum AFRS turn angle
         default_manual_speed:                 0.39         # default speed used when potentiometer is unavailable (one third ahead)
-        play_sound:                        True            # if True, play sound to indicate calibration
-        reposition_time_delay_sec:            3.4          # how long to run the motors when repositioning the servos
+        suppress_monitors:                False            # if True, darken the monitor and screen when running
+        initial_reposition_delay_sec:         0.2          # initial servo delay during repositioning
+        reposition_delay_sec:                 3.2          # how long to run the motors when repositioning the servos
+    calibrator:
+        step_limit:                      590000            # the number of steps to rotate once (roughly) was 570000
+        break_time_ms:                     6000            # how long to wait for the IMU to settle
     stop_handler:                                          # offloads stop handling for motor controller
         stop_ratio:                           0.25         # multiplier for stopping lambda
         halt_ratio:                           0.85         # multiplier for halting lambda
@@ -161,6 +179,11 @@ mros:
         servo-saft-trim:                     61
         servo-saft-min:                     -83
         servo-saft-max:                      90
+        # SAFT ................................
+        servo-cam-channel:                   15
+        servo-cam-trim:                      74 # was 70
+        servo-cam-min:                      -90
+        servo-cam-max:                       90
     geometry:                                              # robot geometry (e.g., KR01)
         wheel_diameter:                      72            # wheel diameter (mm)
         wheel_base:                         242            # wheel base (mm), distance between front and rear axles
@@ -255,7 +278,10 @@ mros:
         system:
             publish_delay_sec:               30.0          # publishing delay loop
             current_threshold:                6.0          # alarm over current
-            voltage_threshold:               16.0          # alarm under voltage
+            battery_threshold:               16.0          # alarm under voltage
+            regulator_5v_threshold:           4.85         # alarm under voltage
+            regulator_3v3_threshold:          3.2          # alarm under voltage
+            temperature_threshold:           60.0          # alarm over temperature
         remote:
             loop_freq_hz:                    20            # polling loop frequency (Hz)
             d0_pin:                          22            # GPIO pin for bit 0
@@ -283,7 +309,7 @@ mros:
             wsf_pin:                         12            # 12 wheel starboard fore
             wpa_pin:                         13            # 13 wheel port aft
             wpf_pin:                         14            # 14 wheel starboard fore
-            mast_pin:                         8            # IOE pin connected to mast IR (aft IOE)
+            mast_pin:                        10            # IOE pin connected to mast IR (aft IOE)
             oblique_trigger_cm:              20            # min distance trigger oblique IR
         gamepad:
             publish_delay_sec:                0.001        #

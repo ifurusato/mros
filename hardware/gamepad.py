@@ -182,7 +182,7 @@ class Gamepad(Component):
                 raise Exception("gamepad device '{}' does not exist.".format(self._device_path))
             self._gamepad = InputDevice(self._device_path)
             # display device info
-            self._log.info(Fore.GREEN + "gamepad: {}".format(self._gamepad))
+            self._log.info(Fore.YELLOW + 'gamepad: {} at path: {}'.format(self._gamepad, self._device_path))
             self._log.info('connected.')
         except Exception as e:
             Component.disable(self)
@@ -226,12 +226,10 @@ class Gamepad(Component):
                 if self._gamepad is None:
                     raise Exception(Gamepad._NOT_AVAILABLE_ERROR + ' [gamepad no longer available]')
                 # loop and filter by event code and print the mapped label
-#               for _event in self._gamepad.read_loop():
                 async for _event in self._gamepad.async_read_loop():
                     _message = self._handleEvent(_event)
                     if callback and _message:
                         await callback(_message)
-#                       await asyncio.sleep(0.02)
                     if not f_is_enabled():
                         self._log.debug('breaking from event loop.')
                         break

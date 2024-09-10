@@ -36,7 +36,7 @@ class SlewLimiter(Component):
         self._log = Logger('slew:{}'.format(orientation.label), level)
         Component.__init__(self, self._log, suppressed=suppressed, enabled=enabled)
         self._orientation = orientation
-        self._millis  = lambda: int(round(time.time() * 1000))
+        self._millis  = lambda: int(round(time.perf_counter() * 1000))
         # slew configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _cfg = config.get('mros').get('motor').get('slew_limiter')
         self._minimum_output    = _cfg.get('minimum_output')

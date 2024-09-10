@@ -9,7 +9,6 @@
 # created:  2024-04-02
 # modified: 2024-04-06
 #
-#
 # Description:
 #
 # Populates an 8x8 matrix from data polled from a VL53L5CX 8x8 ToF sensor,
@@ -47,9 +46,7 @@ from colorama import init, Fore, Style
 init()
 
 from core.component import Component
-#from core.publisher import Publisher
 from core.logger import Logger, Level
-from core.config_loader import ConfigLoader
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class RangingToF(Component):
@@ -68,7 +65,6 @@ class RangingToF(Component):
             raise ValueError('wrong type for log level argument: {}'.format(type(level)))
         self._log = Logger("rtof", level)
         Component.__init__(self, self._log, suppressed, enabled)
-#       Publisher.__init__(self, SensorArray.CLASS_NAME, config, message_bus, message_factory, suppressed=True, level=level)
         if config is None:
             raise ValueError('no configuration provided.')
         self._log.info('configuring time-of-flight sensor...')

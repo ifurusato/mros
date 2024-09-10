@@ -70,6 +70,7 @@ from hardware.irq_clock import IrqClock
 from hardware.motion_controller import MotionController
 from hardware.sound import Sound
 from hardware.player import Player
+from hardware.tinyfx_controller import TinyFxController
 #from hardware.status import Status
 #from hardware.indicator import Indicator
 
@@ -143,6 +144,7 @@ class MROS(Component, FiniteStateMachine):
 #       self._gamepad_controller     = None
         self._rgbmatrix              = None
         self._motor_controller       = None
+        self._tinyfx                 = None
 #       self._killswitch             = None
         self._digital_pot            = None
         self._screen                 = None
@@ -156,15 +158,15 @@ class MROS(Component, FiniteStateMachine):
     def configure(self, arguments):
         '''
         Provided with a set of configuration arguments, configures MROS based on
-        both KD01/KR01 standard hardware as well as optional features, the
-        latter based on devices showing up (by address) on the I²C bus. Optional
-        devices are only enabled at startup time via registration of their feature
-        availability.
+        both MR01 hardware as well as optional features, the latter based on
+        devices showing up (by address) on the I²C bus. Optional devices are only
+        enabled at startup time via registration of their feature availability.
         '''
         self._log.heading('configuration', 'configuring mros…',
             '[1/2]' if arguments.start else '[1/1]')
         self._log.info('application log level: {}'.format(self._log.level.name))
 
+        print("arguments: '{}'".format(arguments))
         # read YAML configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _loader = ConfigLoader(self._level)
         _config_filename = arguments.config_file
@@ -238,8 +240,8 @@ class MROS(Component, FiniteStateMachine):
         else:
             self._irq_clock = None
 
-        self._use_slow_external_clock = self._config['mros'].get('use_slow_external_clock')
-        if self._use_slow_external_clock and _pigpio_available:
+        self._use_slow_irq_clock = self._config['mros'].get('use_slow_external_clock')
+        if self._use_slow_irq_clock and _pigpio_available:
             self._log.info('creating slow external clock…')
             _clock_pin = self._config['mros'].get('hardware').get('irq_clock').get('slow_pin') # pin 23
             self._slow_irq_clock = IrqClock(self._config, pin=_clock_pin, level=self._level)
@@ -264,6 +266,25 @@ class MROS(Component, FiniteStateMachine):
         # TFT screen
         self._screen = Screen(self._config, Level.INFO)
 
+        # create subscribers ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        # motion controller after publishers
+
+        _subs = arguments.subs if arguments.subs else ''
+
+        if _cfg.get('enable_system_subscriber') or 's' in _subs:
+            self._system_subscriber = SystemSubscriber(self._config, self, self._message_bus, level=self._level)
+#           self._system_subscriber.enable()
+
+        if _cfg.get('enable_remote_ctrl_subscriber') or 'r' in _subs:
+            self._remote_ctrl_subscriber = RemoteControlSubscriber(self._config, self._message_bus, level=self._level)
+
+#       if _cfg.get('enable_macro_subscriber'):
+#           if not self._macro_publisher:
+#               raise ConfigurationError('macro subscriber requires macro publisher.')
+#           self._macro_subscriber = MacroSubscriber(self._config, self._message_bus, self._message_factory, self._macro_publisher, self._level)
+#       if _cfg.get('enable_omni_subscriber') or 'o' in _subs:
+#           self._omni_subscriber = OmniSubscriber(self._config, self._message_bus, level=self._level) # reacts to IR sensors
+
         # create publishers  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         _pubs = arguments.pubs if arguments.pubs else ''
@@ -273,7 +294,7 @@ class MROS(Component, FiniteStateMachine):
 
         _enable_system_publisher = _cfg.get('enable_system_publisher')
         if _enable_system_publisher:
-            self._system_publisher = SystemPublisher(self._config, self._message_bus, self._message_factory, level=self._level)
+            self._system_publisher = SystemPublisher(self._config, self._message_bus, self._message_factory, self._system, level=self._level)
 
         _enable_sensor_array_publisher = _cfg.get('enable_sensor_array_publisher')
         if _enable_sensor_array_publisher:
@@ -288,7 +309,7 @@ class MROS(Component, FiniteStateMachine):
 #           self._macro_publisher.set_macro_library(_library)
 
         # include monitor display
-        if self._config['mros'].get('enable_monitor'):
+        if self._config['mros'].get('enable_monitor') and not Util.already_running('monitor_exec.py'):
             self._monitor = Monitor(self._config, level=self._level)
 
         _enable_imu_publisher = _cfg.get('enable_imu_publisher')
@@ -328,29 +349,13 @@ class MROS(Component, FiniteStateMachine):
 #       if _enable_killswitch and _pigpio_available:
 #           self._killswitch = KillSwitch(self._config, self, level=self._level)
 
-        # create subscribers ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-
-        _subs = arguments.subs if arguments.subs else ''
-
-        if _cfg.get('enable_system_subscriber') or 's' in _subs:
-            self._system_subscriber = SystemSubscriber(self._config, self, self._message_bus, level=self._level)
-
-        if _cfg.get('enable_remote_ctrl_subscriber') or 'r' in _subs:
-            self._remote_ctrl_subscriber = RemoteControlSubscriber(self._config, self._message_bus, level=self._level)
-
-#       if _cfg.get('enable_macro_subscriber'):
-#           if not self._macro_publisher:
-#               raise ConfigurationError('macro subscriber requires macro publisher.')
-#           self._macro_subscriber = MacroSubscriber(self._config, self._message_bus, self._message_factory, self._macro_publisher, self._level)
-#       if _cfg.get('enable_omni_subscriber') or 'o' in _subs:
-#           self._omni_subscriber = OmniSubscriber(self._config, self._message_bus, level=self._level) # reacts to IR sensors
-
-
         # add motion controller (subscriber) ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._log.info('configure motor controller…')
         self._motion_controller = MotionController(self._config, self._message_bus, self._irq_clock, level=self._level)
-
         self._motor_controller = self._motion_controller.motor_controller
+
+        self._log.info('configure tinyfx controller…')
+        self._tinyfx = TinyFxController(self._config)
 
         # add task selector ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         if self._slow_irq_clock:
@@ -399,7 +404,7 @@ class MROS(Component, FiniteStateMachine):
                 self._idle   = Idle(self._config, self._message_bus, self._message_factory, self._level)
 
         if _args['gamepad_enabled'] or _cfg.get('enable_gamepad_publisher') or 'g' in _pubs:
-            self._gamepad_publisher = GamepadPublisher(self._config, self._message_bus, self._message_factory, True, self._level)
+            self._gamepad_publisher = GamepadPublisher(self._config, self._message_bus, self._message_factory, exit_on_complete=True, level=self._level)
 #           self._gamepad_controller = GamepadController(self._message_bus, self._level)
 
         # finish up ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -427,6 +432,10 @@ class MROS(Component, FiniteStateMachine):
             # disable Pi LEDs since they may be distracting
             self._set_pi_leds(False)
 
+        if self._system_subscriber:
+            self._log.info('enabling system subscriber…')
+            self._system_subscriber.enable()
+
         if self._slow_irq_clock:
             self._task_selector.print_tasks()
 
@@ -444,6 +453,9 @@ class MROS(Component, FiniteStateMachine):
 #       if self._experiment_mgr:
 #           self._experiment_mgr.enable()
 
+        if self._tinyfx:
+            self._tinyfx.channel_on(TinyFxController.RUNNING)
+
         # begin main loop ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
         self._log.notice('Press Ctrl-C to exit.')
@@ -456,24 +468,11 @@ class MROS(Component, FiniteStateMachine):
         Component.enable(self)
         FiniteStateMachine.enable(self)
 
-        if self._system_subscriber:
-            self._log.info('enabling system subscriber…')
-            self._system_subscriber.enable()
-
         # print registry of components
         self._component_registry.print_registry()
-
         if self._imu and self._icm20948:
             self._motion_controller.set_imu(self._imu)
-            if not self._icm20948.is_calibrated:
-                _cfg = self._config['mros'].get('hardware').get('icm20948')
-                if _cfg.get('motion_calibrate'):
-                    self._motion_controller.calibrate_imu()
-                elif _cfg.get('bench_calibrate'):
-                    self._icm20948.calibrate()
-            self._icm20948.disable_displays()
-
-        if self._monitor and self._slow_irq_clock:
+        if self._monitor and self._slow_irq_clock and not Util.already_running('monitor_exec.py'):
             # prefer slow clock
             self._slow_irq_clock.add_low_frequency_callback(self._monitor.update)
 
@@ -664,6 +663,8 @@ class MROS(Component, FiniteStateMachine):
             self._log.warning('already closing.')
         elif self.enabled:
             self._log.info('disabling…')
+            if self._motion_controller:
+                self._motion_controller.disable()
             if self._task_selector:
                 self._task_selector.close()
             if self._queue_publisher:
@@ -674,8 +675,6 @@ class MROS(Component, FiniteStateMachine):
                 self._external_clock.disable()
             if self._experiment_mgr:
                 self._experiment_mgr.disable()
-            if self._motor_controller:
-                self._motor_controller.disable()
             Component.disable(self)
             FiniteStateMachine.disable(self)
             self._log.info('disabled.')
@@ -711,7 +710,7 @@ class MROS(Component, FiniteStateMachine):
                     _name, _component = _registry.popitem(last=True)
                     if not isinstance(_component, Publisher) and not isinstance(_component, Subscriber) \
                             and _component != self and _component != self._message_bus:
-                        self._log.info(Style.DIM + 'closing component \'{}\' ({})…'.format(_name, _component.classname))
+                        self._log.info(Style.BRIGHT + '💀 closing component \'{}\' ({})…'.format(_name, _component.classname))
                         _component.close()
                 time.sleep(0.1)
                 if self._message_bus and not self._message_bus.closed:
@@ -792,11 +791,14 @@ def print_documentation(console=True):
             print('{} not found.'.format(_help_file))
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-def parse_args():
+def parse_args(passed_args=None):
     '''
     Parses the command line arguments and return the resulting args object.
     Help is available via '--help', '-h', or '--docs', '-d' (for extended help),
     or calling the script with no arguments.
+
+    This optionally permits arguments to be passed in as a list, overriding
+    sys.argv.
     '''
     _log = Logger('parse-args', Level.INFO)
     _log.debug('parsing…')
@@ -824,7 +826,11 @@ def parse_args():
 
     try:
         print('')
-        args = parser.parse_args()
+        if passed_args is None:
+            args = parser.parse_args()
+        else:
+#           parser.parse_args(['1', '2', '3', '4'])
+            args = parser.parse_args(passed_args)
         print("-- ARGS type: {}".format(type(args)))
         if args.docs:
             print(Fore.CYAN + '{}\n{}'.format(parser.format_help(), print_documentation(True)) + Style.RESET_ALL)
@@ -835,6 +841,8 @@ def parse_args():
         else:
             globals.put('log-to-file', args.log)
             return args
+
+
     except NotImplementedError as nie:
         _log.error('unrecognised log level \'{}\': {}'.format(args.level, nie))
         _log.error('exit on error.')
@@ -859,6 +867,7 @@ def signal_handler(signal, frame):
 
 # main ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def main(argv):
+    global _mros
     signal.signal(signal.SIGINT, signal_handler)
     _suppress = False
     _log = Logger("main", Level.INFO)

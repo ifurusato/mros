@@ -25,17 +25,17 @@ class GPS(object):
         '''
         Wraps a PA1010D GPS sensor in a class. A typical output is:
 
-            Timestamp: 05:09:29+00:00
-            Latitude:  -41.27849
-            Longitude: 174.77646
-            Altitude:  8.2
-            Sats:      9
-            Quality:   1
-            Speed:     0.25
-            Fix Type:  3
-            PDOP:      1.38
-            VDOP:      0.90
-            HDOP:      1.05
+            Timestamp:   05:09:29+00:00
+            Latitude:    -41.27849
+            Longitude:   174.77646
+            Altitude:    8.2
+            Satellites:  9
+            Quality:     1
+            Speed:       0.25
+            Fix Type:    3
+            PDOP:        1.38
+            VDOP:        0.90
+            HDOP:        1.05
 
         Values for Position Dilution-of-Precision (PDOP), Horizontal DOP (HDOP) and Vertical DOP (VDOP):
 
@@ -183,20 +183,20 @@ class GPS(object):
                     _style = Style.NORMAL
                 if self._verbose:
                     self._log.info(_style + '''
-                                      Timestamp:  {timestamp}
-                                      Latitude:   {latitude}
-                                      Longitude:  {longitude}
-                                      Lat Dir:    {lat_dir}
-                                      Long Dir:   {lon_dir}
-                                      Altitude:   {altitude}
-                                      Geo Sep:    {geo_sep}
-                                      Sats:       {num_sats}
-                                      Quality:    {gps_qual}
-                                      Speed:      {speed_over_ground}
-                                      Fix Type:   {mode_fix_type}
-                                      PDOP:       {pdop}
-                                      VDOP:       {vdop}
-                                      HDOP:       {hdop}'''.format(**_data))
+        Timestamp:   {timestamp}
+        Latitude:    {latitude:6.4f}
+        Longitude:   {longitude:6.4f}
+        Lat Dir:     {lat_dir}
+        Long Dir:    {lon_dir}
+        Altitude:    {altitude}
+        Geo Sep:     {geo_sep}
+        Satellites:  {num_sats}
+        Quality:     {gps_qual}
+        Speed:       {speed_over_ground}
+        Fix Type:    {mode_fix_type}
+        PDOP:        {pdop}
+        VDOP:        {vdop}
+        HDOP:        {hdop}'''.format(**_data))
                 return True
             else:
                 self._log.info('no satellites found.')

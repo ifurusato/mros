@@ -13,19 +13,19 @@
 #
 
 from enum import Enum
-from math import pi as pi
+from math import pi as π
 from hardware.color import Color
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Cardinal(Enum):
-    NORTH     = ( 0, 'north',        0, pi * 2.0 )
-    NORTHEAST = ( 1, 'north-east',  45, -1.0 )
-    EAST      = ( 2, 'east',        90, pi * 1.5 )
-    SOUTHEAST = ( 3, 'south-east', 135, -1.0 )
-    SOUTH     = ( 4, 'south',      180, pi )
-    SOUTHWEST = ( 5, 'south-west', 225, -1.0 )
-    WEST      = ( 6, 'west',       270, pi / 2.0 )
-    NORTHWEST = ( 7, 'north-west', 315, -1.0 )
+    NORTH     = ( 0, 'north',        0, 0.0 )
+    NORTHEAST = ( 1, 'north-east',  45, π * 0.25 )
+    EAST      = ( 2, 'east',        90, π * 0.50 )
+    SOUTHEAST = ( 3, 'south-east', 135, π * 0.75 )
+    SOUTH     = ( 4, 'south',      180, π )
+    SOUTHWEST = ( 5, 'south-west', 225, π * 1.25 )
+    WEST      = ( 6, 'west',       270, π * 1.50 )
+    NORTHWEST = ( 7, 'north-west', 315, π * 1.75 )
     UNKNOWN   = ( 8, 'unknown',     -1, -1.0 )
 
     # ignore the first param since it's already set by __new__

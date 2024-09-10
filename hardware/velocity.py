@@ -132,7 +132,7 @@ class Velocity(object):
         self._log.info('example conversion:\t{:7.4f}cm/rotation'.format(_test_velocity))
         assert _test_velocity == self._wheel_circumference
         # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        self._stepcount_timestamp = time.time()
+        self._stepcount_timestamp = time.perf_counter()
         self._steps_begin  = 0      # step count at beginning of velocity measurement
         self._velocity     = 0.0    # current velocity
         self._max_velocity = 0.0    # capture maximum velocity attained
@@ -143,7 +143,7 @@ class Velocity(object):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def reset_steps(self):
         self._steps_begin = 0
-        self._stepcount_timestamp = time.time()
+        self._stepcount_timestamp = time.perf_counter()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -170,7 +170,7 @@ class Velocity(object):
                 _time_diff_ms = 0.0
                 _steps = self._motor.steps
                 if self._steps_begin != 0:
-                    _time_diff_sec = time.time() - self._stepcount_timestamp
+                    _time_diff_sec = time.perf_counter() - self._stepcount_timestamp
                     _time_diff_ms = _time_diff_sec * 1000.0
                     _time_error_ms = self._period_ms - _time_diff_ms
                     # we multiply our step count by the percentage error to obtain
@@ -188,7 +188,7 @@ class Velocity(object):
 #                       self._log.info(Fore.BLUE + '{:+d} steps, {:+d}/{:5.2f} diff/corrected; time diff: {:>5.2f}ms; error: {:>5.2f}%;\t'.format(
 #                               self._motor.steps, _diff_steps, _corrected_diff_steps, _time_diff_ms, _time_error_percent * 100.0)
 #                               + Fore.YELLOW + 'motor power: {}; velocity: {:>5.2f} steps/sec; {:<5.2f}cm/sec'.format(self._motor.last_power, _steps_per_sec, self._velocity))
-                self._stepcount_timestamp = time.time()
+                self._stepcount_timestamp = time.perf_counter()
                 self._steps_begin = _steps
 #               self._log.info(Fore.BLUE + '{:+d} steps, {:+d} begin'.format(self._motor.steps, self._steps_begin))
             else:

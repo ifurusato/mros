@@ -7,7 +7,7 @@
 #
 # author:   Murray Altheim
 # created:  2024-07-04
-# modified: 2024-07-07
+# modified: 2024-09-04
 #
 # Derived in part from the sys_info_extended.py example file, part of
 # Luna OLED library, Copyright (c) 2023, Richard Hull and contributors
@@ -16,6 +16,11 @@
 # memory, disk utilization, temperature, IP address, system Uptime,
 # battery, regulator and Pi 3V3 voltages.
 #
+# Note: there is a check to see if an existing instance of this class
+#       is already running, which actually functions but you will see
+#       horizontal phasing of the image as each driver writes to the
+#       display.
+#
 # Dependencies: psutil:
 #
 #   $ sudo apt-get install python-dev
@@ -23,19 +28,23 @@
 #
 
 import os
+#from os import getpid
+#from os.path import exists
 from pathlib import Path
 from datetime import datetime
 from threading import Thread
 from collections import OrderedDict
-import psutil
-import subprocess as sp
+from psutil import cpu_percent, virtual_memory, disk_usage, boot_time, net_if_addrs, net_if_stats
+import itertools
+import subprocess
 import socket
 from colorama import init, Fore, Style
 init()
 
 from luma.core.render import canvas
 from luma.core.interface.serial import i2c
-from luma.oled.device import ssd1327
+#from luma.oled.device import ssd1327 # Zio
+from luma.oled.device import sh1106 # Pimoroni
 from luma.core.error import DeviceNotFoundError
 from PIL import ImageFont
 from ads1015 import ADS1015
@@ -44,6 +53,7 @@ import core.globals as globals
 globals.init()
 
 from core.rate import Rate
+from core.util import Util
 from core.logger import Logger, Level
 from core.component import Component
 from hardware.irq_clock import IrqClock
@@ -61,19 +71,33 @@ class Monitor(Component):
     class will log an error but not otherwise function differently, i.e.,
     the callback on the IRQ clock won't be set and update() will therefore
     not be called.
+    
+    :param: config            the application configuration
+    :param: external_clock    optional external clock for callbacks to update()
+    :param: use_thread        if True, override configuration and use a thread,
+                              overridden if an external clock is supplied.
+    :param: level             the logging level
     '''
-    def __init__(self, config, level=Level.INFO):
+    def __init__(self, config, external_clock=None, use_thread=False, level=Level.INFO):
         self._log = Logger('monitor', level)
         Component.__init__(self, self._log, suppressed=False, enabled=False)
         if config is None:
             raise ValueError('no configuration provided.')
+        if Util.already_running('monitor_exec.py'):
+            raise RuntimeError('monitor is already running.')
+        self._message = None
         # configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         _cfg = config['mros'].get('hardware').get('monitor')
+        _i2c_port       = _cfg.get('i2c_port')
+        _i2c_address    = _cfg.get('i2c_address')
+        _rotate         = _cfg.get('rotate')
+        _update_rate_hz = _cfg.get('update_rate_hz')
+        _use_thread     = _cfg.get('use_thread')
         self._permit_callback = _cfg.get('permit_callback') # setting True introduces message timing issues
         self._batt_max  = 21.5 # theoretical 18v LiOn battery max
         self._pi_max    = 5.25 # Pi operating range: 4.75 to 5.25V
         self._logic_max = 3.5 # 3v3 logic max
-        self._max_current = 15.0 # theoretical maximum current (fused)
+        self._max_current = 5.0 # theoretical maximum current (15A fused)
         self._network_interface_name = None
         self._bar_width       = 52
         self._bar_width_full  = 95
@@ -82,17 +106,23 @@ class Monitor(Component):
         self._margin_x_bar    = 31
         self._margin_x_figure = 83
         self._margin_y_line   = [0, 12, 24, 36, 48, 60, 72, 84, 96, 108]
+        self._margin_y_line_m = [0, 12, 24, 40, 56, 72, 88, 104, 108, 108] # messages start on line 3
         _font_size            = _cfg.get('font_size')
         _font_size_full       = _cfg.get('font_size_full')
+        _font_size_message    = _cfg.get('font_size_message')
         _font_name            = _cfg.get('font_name')
         _font_file            = os.path.join(os.path.dirname(__file__), 'fonts/' + _font_name)
         self._font_default    = ImageFont.truetype(_font_file, _font_size)
         self._font_full       = ImageFont.truetype(_font_file, _font_size_full)
+        self._font_message    = ImageFont.truetype(_font_file, _font_size_message)
+        _contrast             = _cfg.get('contrast')
         self.__callback = None
         # get device ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._device = None
         try:
-            self._device = ssd1327(i2c(port=0, address=0x3C))
+#           self._device = ssd1327(i2c(port=0, address=0x3C), rotate=1) # Zio
+            self._device = sh1106(i2c(port=_i2c_port, address=_i2c_address), width=128, height=128, rotate=_rotate) # Pimoroni
+            self._device.contrast(_contrast)
         except DeviceNotFoundError:
             self._log.error('no monitor available: display not found.')
         # ADS1015 ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -112,21 +142,32 @@ class Monitor(Component):
         if self._ina260 is None:
             self._ina260 = Ina260(config, level=level)
 
-        _use_thread = True
-        if _use_thread:
-            # update thread ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-            self._update_loop_thread = Thread(name='update_loop_thread', target=Monitor._update_loop, args=[self], daemon=True)
-            self._update_loop_thread.start()
-            self._irq_clock = None
-            _hz = 2
-            self._rate = Rate(_hz, level=Level.INFO)
+        self._counter = None
+        self._irq_clock = None
+        if external_clock is not None:
+            # External Clock ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+            self._log.info('using supplied external clock for update loop.')
             self.enable()
+            self._counter = itertools.count()
+            external_clock.add_callback(self.update)
+        elif use_thread or _use_thread:
+            # update thread ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+            self._log.info('using thread for update loop operating at {:d}Hz.'.format(_update_rate_hz))
+            self._update_loop_thread = Thread(name='update_loop_thread', target=Monitor._update_loop, args=[self], daemon=True)
+            self.enable()
+            self._update_loop_thread.start()
+            self._rate = Rate(_update_rate_hz, level=Level.INFO)
         else:
             # IRQ Clock ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
             self._irq_clock = _component_registry.get('irq-clock-slo')
             if self._irq_clock is None:
-                CLOCK_PIN = 23
-                self._irq_clock = IrqClock(config, pin=CLOCK_PIN, level=Level.INFO)
+                self._log.info('using local external clock for update loop.')
+                _clock_pin = config['mros'].get('hardware').get('irq_clock').get('slow_pin') # pin 23
+                self._irq_clock = IrqClock(config, pin=_clock_pin, level=Level.INFO)
+            else:
+                self._log.info('using external clock from registry for update loop.')
+            self.enable()
+            self._counter = itertools.count()
             self._irq_clock.add_callback(self.update)
         # add to global object registry ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         globals.put('monitor', self)
@@ -157,21 +198,21 @@ class Monitor(Component):
     # data ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
     def get_temp(self):
-        temp = float(sp.getoutput("vcgencmd measure_temp").split("=")[1].split("'")[0])
+        temp = float(subprocess.getoutput("vcgencmd measure_temp").split("=")[1].split("'")[0])
         return temp
 
     def get_cpu(self):
-        return psutil.cpu_percent()
+        return cpu_percent()
 
     def get_mem(self):
-        return psutil.virtual_memory().percent
+        return virtual_memory().percent
 
     def get_disk_usage(self):
-        usage = psutil.disk_usage("/")
+        usage = disk_usage("/")
         return usage.used / usage.total * 100
 
     def get_uptime(self):
-        uptime = ("%s" % (datetime.now() - datetime.fromtimestamp(psutil.boot_time()))).split(".")[0]
+        uptime = ("%s" % (datetime.now() - datetime.fromtimestamp(boot_time()))).split(".")[0]
         return "UpTime: {}".format(uptime)
 
     def get_timestamp(self):
@@ -184,14 +225,14 @@ class Monitor(Component):
                 return addr.address
 
     def get_ipv4_address(self, interface_name=None):
-        if_addrs = psutil.net_if_addrs()
+        if_addrs = net_if_addrs()
 
         if isinstance(interface_name, str) and interface_name in if_addrs:
             addrs = if_addrs.get(interface_name)
             address = self.find_single_ipv4_address(addrs)
             return address if isinstance(address, str) else ""
         else:
-            if_stats = psutil.net_if_stats()
+            if_stats = net_if_stats()
             # remove loopback
             if_stats_filtered = {key: if_stats[key] for key, stat in if_stats.items() if "loopback" not in stat.flags}
             # sort interfaces by
@@ -231,6 +272,9 @@ class Monitor(Component):
     def _draw_text(self, draw, margin_x, line_num, text):
         draw.text((margin_x, self._margin_y_line[line_num]), text, font=self._font_default, fill="white")
 
+    def _draw_message(self, draw, margin_x, line_num, text):
+        draw.text((margin_x, self._margin_y_line_m[line_num]), text, font=self._font_message, fill="white")
+
     def _draw_bar(self, draw, line_num, percent):
         top_left_y = self._margin_y_line[line_num] + self._bar_margin_top
         draw.rectangle((self._margin_x_bar, top_left_y, self._margin_x_bar + self._bar_width, top_left_y + self._bar_height), outline="white")
@@ -247,9 +291,30 @@ class Monitor(Component):
             self._device.clear()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_message(self, message):
+        self._message = message
+    
+    def _display_message(self, draw):
+        _nlines = self._message.count('\n')
+        if _nlines < 2:
+            self._draw_message(draw, 0, 3, self._message)
+        else:
+            _lines = self._message.split('\n')
+            for n in range(0,len(_lines)):
+                _line = _lines[n]
+                self._draw_message(draw, 0, n+2, _line)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def update(self):
         if self._device and self.enabled:
+            if self._counter:
+                _count = next(self._counter)
+                if _count % 5 != 0: # clock is 5Hz, we want 1Hz updates
+                    return
             with canvas(self._device) as draw:
+                if self._message is not None:
+                    self._display_message(draw)
+                    return
                 # line 0 : temperature ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 _temp = self.get_temp()
                 self._draw_text(draw, 0, 0, "Temp")
@@ -311,9 +376,15 @@ class Monitor(Component):
     
                 # line 7 : current ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
                 _current = self.get_current()
-                self._draw_text(draw, 0, 7, "Curnt")
+                self._draw_text(draw, 0, 7, "Curr")
+                if _current < 1.0:
+                    _display_current = int(_current * 1000.0)
+                    _c_un = " {:5.0f}mA"
+                else:
+                    _display_current = _current
+                    _c_un = " {:5.2f}A"
                 if _current < self._max_current:
-                    self._draw_text(draw, self._margin_x_figure, 7, " {:5.2f}A".format(_current))
+                    self._draw_text(draw, self._margin_x_figure, 7, _c_un.format(_display_current))
                     self._draw_bar(draw, 7, ( _current / self._max_current * 100.0) )
                 else:
                     self._draw_bar_full(draw, 7)

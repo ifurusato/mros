@@ -7,7 +7,7 @@
 #
 # author:   Murray Altheim
 # created:  2024-03-30
-# modified: 2024-07-31
+# modified: 2024-08-10
 #
 # This is the script for the port-side TinyPICO, labeled "8", /dev/ttyUSB0.
 #
@@ -34,20 +34,22 @@ COPY_SOUND_FILES = False
 
 # set up pins on the ESP32 representing bits of an int
 
-PIN_0    = 22 # 11 on IOE
-PIN_1    =  4 # 13 on IOE
-PIN_2    = 21 # 12 on IOE
-PIN_3    = 32 # 14 on IOE
-PIN_4    = 33 # 10 on IOE
-GAIN_PIN = 14
+PIN_0    = 22 # 1 on IOE
+PIN_1    = 33 # 2 on IOE
+PIN_2    =  4 # 3 on IOE
+PIN_3    = 32 # 4 on IOE
+PIN_4    = 14 # 5 on IOE
+PIN_5    = 21 # 6 on IOE
+PIN_6    = 15 # 7 on IOE
+
 
 pin0 = Pin(PIN_0, Pin.IN, Pin.PULL_UP)
 pin1 = Pin(PIN_1, Pin.IN, Pin.PULL_UP)
 pin2 = Pin(PIN_2, Pin.IN, Pin.PULL_UP)
 pin3 = Pin(PIN_3, Pin.IN, Pin.PULL_UP)
 pin4 = Pin(PIN_4, Pin.IN, Pin.PULL_UP)
-
-gain_pin = Pin(GAIN_PIN, Pin.OUT)
+pin5 = Pin(PIN_5, Pin.IN, Pin.PULL_UP)
+pin6 = Pin(PIN_6, Pin.IN, Pin.PULL_UP)
 
 last_index = None
 
@@ -123,11 +125,10 @@ def check_ram():
 
 def get_selected_index():
     '''
-    Converts the five input pin values as a binary-coded number,
-    returning an int between 0 and 31.
+    Converts the seven input pin values as a binary-coded decimal (BCD),
+    returning an int between 0 and 127.
     '''
-#   print('binary: {}{}{}{}{}'.format(pin0.value(), pin1.value(), pin2.value(), pin3.value(), pin4.value()))
-    return int('{}{}{}{}{}'.format(pin0.value(), pin1.value(), pin2.value(), pin3.value(), pin4.value()), 2)
+    return int('{}{}{}{}{}{}{}'.format(pin6.value(), pin5.value(), pin4.value(), pin3.value(), pin2.value(), pin1.value(), pin0.value()), 2)
 
 def poll():
     '''

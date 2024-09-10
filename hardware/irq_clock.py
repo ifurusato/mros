@@ -17,6 +17,7 @@ init()
 
 from core.logger import Logger, Level
 from core.component import Component
+from core.util import Util
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class IrqClock(Component):
@@ -99,6 +100,7 @@ class IrqClock(Component):
         if callback:
             if callback in self.__callbacks:
                 raise Exception('callback already exists.')
+            self._log.info('added callback: {}.{}()'.format(Util.get_class_name_of_method(callback), callback.__name__))
             self.__callbacks.append(callback)
         else:
             raise TypeError('null callback argument')

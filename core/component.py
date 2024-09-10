@@ -210,7 +210,9 @@ class ComponentRegistry(object):
         with _mutex:
             self._log.info('component list:')
             for _name, _component in self._dict.items():
-                self._log.info('  {} {}'.format(_name, Util.repeat(' ', 16 - len(_name))) + Fore.YELLOW + '{}'.format(_component.classname))
+                self._log.info('  {} {}'.format(_name, Util.repeat(' ', 16 - len(_name))) 
+                        + Fore.YELLOW + '{}'.format(_component.classname)
+                        + Fore.CYAN + '{} {}'.format(Util.repeat(' ', 24 - len(_component.classname)), _component.enabled))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def get_registry(self):

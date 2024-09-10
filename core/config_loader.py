@@ -37,7 +37,7 @@ class ConfigLoader(object):
 
         :param filename:  the optional name of the YAML file to load. Default: config.yaml
         '''
-        self._log.info('reading from YAML configuration file {}...'.format(filename))
+        self._log.info('reading from YAML configuration file {}…'.format(filename))
         _config = yaml.safe_load(open(filename, 'r'))
         if self._log.level == Level.DEBUG:
             self._log.debug('YAML configuration as read:')

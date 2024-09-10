@@ -11,6 +11,7 @@
 #
 
 import time
+from threading import Thread
 from colorama import init, Fore, Style
 init()
 
@@ -24,18 +25,20 @@ from hardware.sound import Sound
 class Player(Component):
     __instance = None
     IOE_I2C_ADDRESS = 0x18
-    PIN_0 =  9
-    PIN_1 = 10
-    PIN_2 = 11
-    PIN_3 = 12
-    PIN_4 = 13
-    PINS = [ PIN_0, PIN_1, PIN_2, PIN_3, PIN_4 ]
+    PIN_0 =  1
+    PIN_1 =  2
+    PIN_2 =  3
+    PIN_3 =  4
+    PIN_4 =  5
+    PIN_5 =  6
+    PIN_6 =  7
+    PINS = [ PIN_0, PIN_1, PIN_2, PIN_3, PIN_4, PIN_5, PIN_6 ]
     '''
     A sound player that relies upon a connection between an IO Expander
     and an external sound module, which has five input pins, using BCD
-    to trigger one of 32 sounds (1-32). The first sound (index 1) is a
-    clip of silence, which is used to reset the player, which reacts
-    only to changes.
+    to trigger one of 128 sounds. The first sound (index 1) is a clip
+    of silence, which is used to reset the player, which reacts only to
+    changes.
 
     This is a singleton class; obtain its instance and play a sound via:
 
@@ -61,6 +64,7 @@ class Player(Component):
                 cls.__instance._ioe.set_mode(pin, io.OUT)
                 cls.__instance._ioe.output(pin, io.LOW)
             cls.__instance._looping = False
+            cls.__instance._play_sound_thread = None
             cls.__instance._log.info('ready.')
         return cls.__instance
 
@@ -100,13 +104,74 @@ class Player(Component):
 
     @staticmethod
     def int2bin(n):
-        b = '{0:05b}'.format(n)
+        b = '{0:07b}'.format(n)
+#       print("b: '{}'".format(b))
         _v0 = io.HIGH if b[0] == '1' else io.LOW
         _v1 = io.HIGH if b[1] == '1' else io.LOW
         _v2 = io.HIGH if b[2] == '1' else io.LOW
         _v3 = io.HIGH if b[3] == '1' else io.LOW
         _v4 = io.HIGH if b[4] == '1' else io.LOW
-        return _v4, _v3, _v2, _v1, _v0
+        _v5 = io.HIGH if b[5] == '1' else io.LOW
+        _v6 = io.HIGH if b[6] == '1' else io.LOW
+        return _v6, _v5, _v4, _v3, _v2, _v1, _v0
+
+    @staticmethod
+    def play_from_thread(value):
+        '''
+        Plays a Sound using a Thread, returning the sound duration. This is to
+        avoid the sound interrupting normal operation.
+
+        The argument can be a Sound or an index (0-31). Following play this sends
+        a zero ('00000') to the TinyPICO as a reset, as it only reacts to changes.
+        '''
+        if isinstance(value, Sound):
+            _sound = value
+        elif isinstance(value, int):
+            _sound = Sound.from_index(value)
+        _player = Player.instance()
+        _player.halt_thread()
+        _is_daemon = True
+        _player._play_sound_thread = Thread(target = _player._play, args=[_sound], name='play_sound', daemon=_is_daemon)
+        _player._play_sound_thread.start()
+        _duration = _sound.duration
+        return _duration * 1.2
+
+    @staticmethod
+    def halt_thread():
+        _player = Player.instance()
+        if _player._play_sound_thread is not None:
+            _player._log.info("halting thread…")
+            _player._play_sound_thread.join()
+            _player._log.info("halted thread.")
+
+    def _play(self, sound):
+        _index = sound.index
+        _index -= 1 # zero-based
+        _name = sound.name
+        _duration = sound.duration
+        _description = sound.description
+        _b = Player.int2bin(_index)
+        self._ioe.output(Player.PINS[0], _b[0])
+        self._ioe.output(Player.PINS[1], _b[1])
+        self._ioe.output(Player.PINS[2], _b[2])
+        self._ioe.output(Player.PINS[3], _b[3])
+        self._ioe.output(Player.PINS[4], _b[4])
+        self._ioe.output(Player.PINS[5], _b[5])
+        self._ioe.output(Player.PINS[6], _b[6])
+        # reverse order in terms of BCD display
+#       self._log.info(Fore.GREEN + "n={:d};\tb='{}{}{}{}{}{}{}'".format(_index, _b[6], _b[5], _b[4], _b[3], _b[2], _b[1], _b[0]))
+        self._log.debug("playing sound [{}] '{}' ({}) for {:3.2f}s…".format(_index, _name, _description, _duration))
+        # reset player by sending '00000'
+        time.sleep(_duration)
+        self._ioe.output(Player.PINS[0], io.LOW)
+        self._ioe.output(Player.PINS[1], io.LOW)
+        self._ioe.output(Player.PINS[2], io.LOW)
+        self._ioe.output(Player.PINS[3], io.LOW)
+        self._ioe.output(Player.PINS[4], io.LOW)
+        self._ioe.output(Player.PINS[5], io.LOW)
+        self._ioe.output(Player.PINS[6], io.LOW)
+        time.sleep(0.1)
+        self._play_sound_thread = None
 
     @staticmethod
     def play(value):
@@ -131,9 +196,11 @@ class Player(Component):
         _player._ioe.output(Player.PINS[2], _b[2])
         _player._ioe.output(Player.PINS[3], _b[3])
         _player._ioe.output(Player.PINS[4], _b[4])
+        _player._ioe.output(Player.PINS[5], _b[5])
+        _player._ioe.output(Player.PINS[6], _b[6])
         # reverse order in terms of BCD display
-        _player._log.info(Fore.GREEN + "n={:d};\tb='{}{}{}{}{}'".format(_index, _b[4], _b[3], _b[2], _b[1], _b[0]))
-        _player._log.info("playing sound [{}] '{}' ({}) for {:3.2f}s…".format(_index, _name, _description, _duration))
+#       _player._log.info(Fore.GREEN + "n={:d};\tb='{}{}{}{}{}{}{}'".format(_index, _b[6], _b[5], _b[4], _b[3], _b[2], _b[1], _b[0]))
+        _player._log.debug("playing sound [{}] '{}' ({}) for {:3.2f}s…".format(_index, _name, _description, _duration))
         # reset player by sending '00000'
         time.sleep(_duration)
         _player._ioe.output(Player.PINS[0], io.LOW)
@@ -141,6 +208,9 @@ class Player(Component):
         _player._ioe.output(Player.PINS[2], io.LOW)
         _player._ioe.output(Player.PINS[3], io.LOW)
         _player._ioe.output(Player.PINS[4], io.LOW)
+        _player._ioe.output(Player.PINS[5], io.LOW)
+        _player._ioe.output(Player.PINS[6], io.LOW)
         time.sleep(0.1)
+        _player._play_sound_thread = None
 
 #EOF

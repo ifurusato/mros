@@ -376,6 +376,7 @@ class MessageBus(Component):
         self._enable_publishers()
         self._log.info('starting {:d} subscriber{}…'.format(len(self._subscribers), '' if len(self._subscribers) == 1 else 's'))
         for subscriber in self._subscribers:
+            self._log.info('starting {}…'.format(subscriber.name))
             subscriber.start()
         self._log.info('starting consume loop with {:d} subscriber{}…'.format(
                 len(self._subscribers), '' if len(self._subscribers) == 1 else 's'))

@@ -35,7 +35,7 @@ class Rotated(object):
         self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def in_range(self):
+    def is_rotated(self):
         '''
         Returns True if the sensor is in range of the reflective surface
         on the rotated steering armature.

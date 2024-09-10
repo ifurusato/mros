@@ -35,7 +35,7 @@ class Screen(Component):
             raise ValueError('no configuration provided.')
         _cfg = config['mros'].get('hardware').get('screen')
         self._pin = _cfg.get('pin')
-        self._log.info(Fore.WHITE + "configuring screen control on pin {}…".format(self._pin))
+        self._log.info("configuring screen control on pin {}…".format(self._pin))
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self._pin, GPIO.OUT)

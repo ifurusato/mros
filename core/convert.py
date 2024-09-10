@@ -7,13 +7,16 @@
 #
 # author:   Murray Altheim
 # created:  2020-03-27
-# modified: 2020-03-27
+# modified: 2024-08-26
 #
 #  A class containing some static IMU-related conversion methods.
 #
 
 import numpy, math
-from math import pi as PI
+from math import pi as π
+from math import tau as τ
+
+from core.cardinal import Cardinal
 
 X = 0
 Y = 1
@@ -61,10 +64,32 @@ class Convert:
     @staticmethod
     def difference_in_radians(starting_angle, target_angle):
         '''
-        Return the shortest angular difference between two angles (provided
-        in radians), returning the result as a float.
+        Return the shortest angular difference between two angles provided
+        in radians, returning the result as a float. Uses trigonometry.
         '''
         return math.atan2(math.sin(target_angle - starting_angle), math.cos(target_angle - starting_angle))
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def get_angle_between_in_radians(a1, a2):
+        '''
+        Computes the shortest angular difference between the two angles
+        provided in radians, returning the value as a float. Uses geometry.
+        '''
+        return min(a2 - a1, a2 - a1 + τ, a2 - a1 - τ, key=abs)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def get_offset_from_cardinal(radians, cardinal):
+         '''
+         Returns the ± difference in angle between the argument
+         and the provided Cardinal direction.
+         '''
+         if not isinstance(radians, float):
+             raise ValueError('expected float value for radians argument.')
+         if not isinstance(cardinal, Cardinal):
+             raise ValueError('expected Cardinal value for cardinal argument.')
+         return Convert.get_angle_between_in_radians(radians, cardinal.radians)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
@@ -113,7 +138,7 @@ class Convert:
 
         heading_rad = math.atan2(mag[AXES[0]], mag[AXES[1]])
         if heading_rad < 0:
-            heading_rad += 2 * math.pi
+            heading_rad += τ
         heading_deg = math.degrees(heading_rad)
         if offset != 0:
             heading_deg = Convert.offset_in_degrees(heading_deg, offset)
@@ -159,9 +184,9 @@ class Convert:
             elif x >= 0.0:
                 return 0.0
         elif y > 0.0:
-            return 90.0 - math.atan( x / y ) * ( 180.0 / math.pi )
+            return 90.0 - math.atan( x / y ) * ( 180.0 / π )
         elif y < 0.0:
-            return 270.0 - math.atan( x / y ) * ( 180.0 / math.pi )
+            return 270.0 - math.atan( x / y ) * ( 180.0 / π )
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
@@ -169,7 +194,7 @@ class Convert:
         '''
         Return the argument rotated 90 degrees.
         '''
-        return Convert.to_degrees(Convert.to_radians(degrees) - ( math.pi / 2.0 ))
+        return Convert.to_degrees(Convert.to_radians(degrees) - ( π / 2.0 ))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
@@ -177,7 +202,7 @@ class Convert:
         '''
         Return the argument rotated 180 degrees.
         '''
-        return Convert.to_degrees((Convert.to_radians(degrees) + math.pi) % ( 2.0 * math.pi ))
+        return Convert.to_degrees((Convert.to_radians(degrees) + π) % τ)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
@@ -187,5 +212,56 @@ class Convert:
         of each other.
         '''
         return p >= ( q - error_range ) and p <= ( q + error_range )
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def convert_to_distance(value):
+        '''
+        Converts the value returned by the IR sensor to a distance in centimeters.
+
+        Distance Calculation ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+        This is reading the distance from a 3 volt Sharp GP2Y0A60SZLF infrared
+        sensor to a piece of white A4 printer paper in a low ambient light room.
+        The sensor output is not linear, but its accuracy is not critical. If
+        the target is too close to the sensor the values are not valid. According
+        to spec 10cm is the minimum distance, but we get relative variability up
+        until about 5cm. Values over 150 clearly indicate the robot is less than
+        10cm from the target. Here's a sampled output:
+
+            0cm = unreliable
+            5cm = 226.5
+          7.5cm = 197.0
+           10cm = 151.0
+           20cm =  92.0
+           30cm =  69.9
+           40cm =  59.2
+           50cm =  52.0
+           60cm =  46.0
+           70cm =  41.8
+           80cm =  38.2
+           90cm =  35.8
+          100cm =  34.0
+          110cm =  32.9
+          120cm =  31.7
+          130cm =  30.7 *
+          140cm =  30.7 *
+          150cm =  29.4 *
+
+        * Maximum range on IR is about 130cm, after which there is diminishing
+          stability/variability, i.e., it's hard to determine if we're dealing
+          with a level of system noise rather than data. Different runs produce
+          different results, with values between 28 - 31 on a range of any more
+          than 130cm.
+
+        See: http://ediy.com.my/blog/item/92-sharp-gp2y0a21-ir-distance-sensors
+        '''
+        if value == None or value == 0:
+            return None
+        _FUDGE_FACTOR = -2.00
+        _EXPONENT = 1.34
+        _NUMERATOR = 1000.0
+        _distance = pow( _NUMERATOR / value, _EXPONENT ) + _FUDGE_FACTOR
+        return _distance
 
 # EOF

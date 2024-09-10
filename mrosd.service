@@ -5,7 +5,7 @@
 #
 # author:   Murray Altheim
 # created:  2020-08-01
-# modified: 2024-04-09
+# modified: 2024-09-04
 #
 # This mrosd service configuration file should be copied to:
 #
@@ -38,10 +38,11 @@ Description=MROS Daemon Service
 After=multi-user.target
 
 [Service]
-WorkingDirectory=/home/pi/mros
+#WorkingDirectory=/home/pi/mros
+WorkingDirectory=/home/pi/workspaces/workspace-mros/mros
 User=pi
 Type=simple
-ExecStart=/usr/bin/python3 /home/pi/mros/mrosd.py &> /dev/null
+ExecStart=/usr/bin/python3 /home/pi/workspaces/workspace-mros/mros/mrosd.py &> /dev/null
 Restart=on-success
 #PidFile=/home/pi/ros/.mrosd.pid
 

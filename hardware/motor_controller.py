@@ -19,6 +19,9 @@ from threading import Thread
 from colorama import init, Fore, Style
 init()
 
+import core.globals as globals
+globals.init()
+
 from core.component import Component
 from core.direction import Direction
 from core.orientation import Orientation
@@ -34,6 +37,7 @@ from hardware.slew_rate import SlewRate
 class MotorController(Component):
 
     STOP_LAMBDA_NAME  = "__stop_accum" # TEMP moved to StopHandler
+    HALT_LAMBDA_NAME  = "__halt_accum" # TEMP moved to StopHandler
     PORT_CW_ROTATE_LAMBDA_NAME   = "__port_rotate_cw_steering"
     STBD_CW_ROTATE_LAMBDA_NAME   = "__stbd_rotate_cw_steering"
     PORT_CCW_ROTATE_LAMBDA_NAME  = "__port_rotate_ccw_steering"
@@ -424,11 +428,11 @@ class MotorController(Component):
         '''
         if rotation is None:
             raise ValueError('rotation argument not provided.')
-        self._log.info('🍐 rotate {}; current rotation speed multiplier: {:5.2f}'.format(rotation, self._rotation_speed_multiplier))
+#       self._log.info('rotate {}; current rotation speed multiplier: {:5.2f}'.format(rotation, self._rotation_speed_multiplier))
 #       self.__callback = None
         self.reset_rotating()
         if rotation is Rotation.STOPPED:
-            self._log.info('🍐 no rotation.')
+            self._log.info('rotation: none')
             self._reset_slew_rate()
             self.set_motor_speed(Orientation.PFWD, 0.0)
             self.set_motor_speed(Orientation.SFWD, 0.0) 
@@ -438,22 +442,26 @@ class MotorController(Component):
             self.set_motor_speed(Orientation.SAFT, 0.0)
         elif rotation is Rotation.CLOCKWISE:
             self._set_slew_rate(SlewRate.FASTEST)
-            self._log.info('🍐 rotate clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+            self._log.info('rotate clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
             self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CW_ROTATE_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
 #           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CW_ROTATE_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
             self._paft_motor.add_speed_multiplier(MotorController.PORT_CW_ROTATE_LAMBDA_NAME, self._port_cw_rotate_lambda, True)
             self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CW_ROTATE_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
 #           self._smid_motor.add_speed_multiplier(MotorController.STBD_CW_ROTATE_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
             self._saft_motor.add_speed_multiplier(MotorController.STBD_CW_ROTATE_LAMBDA_NAME, self._stbd_cw_rotate_lambda, True)
+            # now set motor speed to actually rotate...
+            # TODO
         elif rotation is Rotation.COUNTER_CLOCKWISE:
             self._set_slew_rate(SlewRate.FASTEST)
-            self._log.info('🍐 rotate counter-clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
+            self._log.info('rotate counter-clockwise, rotation speed multiplier: {:5.2f}'.format(self._rotation_speed_multiplier))
             self._pfwd_motor.add_speed_multiplier(MotorController.PORT_CCW_ROTATE_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
 #           self._pmid_motor.add_speed_multiplier(MotorController.PORT_CCW_ROTATE_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
             self._paft_motor.add_speed_multiplier(MotorController.PORT_CCW_ROTATE_LAMBDA_NAME, self._port_ccw_rotate_lambda, True)
             self._sfwd_motor.add_speed_multiplier(MotorController.STBD_CCW_ROTATE_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
 #           self._smid_motor.add_speed_multiplier(MotorController.STBD_CCW_ROTATE_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
             self._saft_motor.add_speed_multiplier(MotorController.STBD_CCW_ROTATE_LAMBDA_NAME, self._stbd_ccw_rotate_lambda, True)
+            # now set motor speed to actually rotate...
+            # TODO
         else:
             raise Exception('expected stopped, clockwise or counter-clockwise argument.')
 
@@ -556,7 +564,7 @@ class MotorController(Component):
                 _motor.clear_speed_multipliers()
             else:
                 raise Exception('null motor in clear list.')
-        self._log.info(Fore.MAGENTA + Style.BRIGHT + 'cleared all speed multiplier lambdas  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ ')
+        self._log.info('cleared all speed multiplier lambdas.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def list_speed_multipliers(self):
@@ -574,28 +582,11 @@ class MotorController(Component):
         This is a lambda function that will slow the motors to zero speed
         at a rather slow rate.
         '''
+        print('🍺 _braking_function')
         target_speed = target_speed * self._brake_ratio
         if self.all_motors_are_stopped:
             # return lambda name indicating we're done
             return MotorController.BRAKE_LAMBDA_NAME
-        elif isclose(target_speed, 0.0, abs_tol=1e-2):
-            return 0.0
-        else:
-            return target_speed
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _halting_function(self, target_speed):
-        '''
-        This is a lambda function that returns the target speed diminished
-        by the halt ratio, until either it reaches near zero (and then returns
-        zero), or at such time when there are no lambdas operating on this or
-        any other motor, in which case it returns the name of the lambda as a
-        signal that the robot has stopped.
-        '''
-        target_speed = target_speed * self._halt_ratio
-        if self.all_motors_are_stopped:
-            # return lambda name indicating we're done
-            return MotorController.HALT_LAMBDA_NAME
         elif isclose(target_speed, 0.0, abs_tol=1e-2):
             return 0.0
         else:
@@ -607,6 +598,7 @@ class MotorController(Component):
         This is a lambda function that will slow the motors to zero speed
         very quickly. This additionally directly calls stop() on all motors.
         '''
+        print('🍺 _stopping_function')
         _stop_ratio = 0.25
         target_speed = target_speed * _stop_ratio
         if self.all_motors_are_stopped:
@@ -671,14 +663,16 @@ class MotorController(Component):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable(self):
         '''
-        Disable the motors, halting first if in motion.
+        Disable the motors.
         '''
         if self.enabled:
-            self._log.info('disabling…')
             if self._external_clock:
+                self._log.info('disabling by removing external clock callback…')
                 self._external_clock.remove_callback(self.external_callback_method)
             else:
-                self._stop_loop() # stop loop thread if we're using it
+                # or stop loop thread if we're using it
+                self._log.info('disabling by stopping loop…')
+                self._stop_loop() 
             Component.disable(self)
             self._log.info('disabled.')
         else:

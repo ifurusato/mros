@@ -17,7 +17,7 @@ import time
 import itertools
 import math, statistics
 from math import isclose
-from math import pi as PI
+from math import pi as π
 from threading import Thread
 from colorama import init, Fore, Style
 init()
@@ -26,9 +26,9 @@ import core.globals as globals
 globals.init()
 
 from core.rate import Rate
-from core.speed import Speed
 from core.convert import Convert
 from core.cardinal import Cardinal
+from core.direction import Direction
 from core.rotation import Rotation
 from core.util import Util
 from core.chadburn import Chadburn
@@ -38,12 +38,13 @@ from core.event import Event, Group
 from core.orientation import Orientation
 from core.subscriber import Subscriber
 from core.logger import Logger, Level
-from hardware.task_selector import TaskSelector
+from hardware.calibrator import Calibrator
+from hardware.digital_pot import DigitalPotentiometer
+from hardware.pushbutton import PushButton
 from hardware.stop_handler import StopHandler
 from hardware.servo_controller import ServoController
 from hardware.headlight import Headlight
 from hardware.servo import Servo
-from hardware.sensor_array import SensorData
 from hardware.motor_controller import MotorController
 from hardware.motion_coordinator import MotionCoordinator
 from hardware.sound import Sound
@@ -78,11 +79,12 @@ class MotionController(Subscriber):
             raise ValueError('no configuration provided.')
         self._config = config
         self._component_registry = globals.get('component-registry')
-#       self._component_registry = self._mros.get_component_registry()
         if self._component_registry:
             self._sensor_array = self._component_registry.get('pub:sensors')
             self._log.info('using sensor array.')
             self._digital_pot  = self._component_registry.get('digital-pot-0x0E')
+            if self._digital_pot is None:
+                self._digital_pot = DigitalPotentiometer(config, level=self._level)
             self._digital_pot.set_output_range(0.0, 1.0)
             self._log.info('using digital potentiometer.')
             self._monitor = self._component_registry.get('monitor')
@@ -96,10 +98,13 @@ class MotionController(Subscriber):
         self._wheel_offset = config.get('mros').get('geometry').get('wheel_offset')
         _wheel_diameter = config.get('mros').get('geometry').get('wheel_diameter')
         # motion controller # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        _cfg = config['mros'].get('motion_controller')
-        self._play_sound = _cfg.get('play_sound')
+        _cfg = config['mros']
+        self._initial_calibration = _cfg.get('initial_calibration')
+        self._suppress_monitors   = _cfg.get('suppress_monitors')
+        self._play_sound          = _cfg.get('play_sound')
         if self._play_sound:
             self._player = Player.instance()
+        _cfg = config['mros'].get('motion_controller')
         self._imu        = None
         self._afrs_max_ratio = _cfg.get('afrs_max_ratio') # ratio at maximum turn
         _max_angle       = _cfg.get('afrs_max_angle')     # maximum AFRS inner turn angle
@@ -107,7 +112,8 @@ class MotionController(Subscriber):
         self._incr_clamp = lambda n: max(min(7, n), -7)
         self._pot        = None # used for manual control
         self._default_manual_speed = _cfg.get('default_manual_speed')
-        self._reposition_time_delay_sec = _cfg.get('reposition_time_delay_sec') # 3.4
+        self._initial_reposition_delay_sec = _cfg.get('initial_reposition_delay_sec')
+        self._reposition_delay_sec = _cfg.get('reposition_delay_sec') # 3.4
         # servo controller # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._servo_controller = ServoController(config, level=level)
         self._all_servos = self._servo_controller.get_servos()
@@ -116,6 +122,7 @@ class MotionController(Subscriber):
         self._steering_angle_index = 0
         self._steering_angle = SteeringAngle.STRAIGHT_AHEAD # enumerated by DPad
         self._steering_mode = None
+        self._calibrated = None
         # lambdas to alter speed for steering ┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._port_motor_ratio = 1.0
         self._stbd_motor_ratio = 1.0
@@ -129,6 +136,7 @@ class MotionController(Subscriber):
         self._log.info('created motor controller with {} motors.'.format(len(self._all_motors)))
         self._speed_value = 0.0 # set by L3 Vertical
         # stop handler # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        self._slow_to_stop = True # TODO use config
         self._stop_handler = StopHandler(config, self._motor_controller, level)
         # subscribe to event groups ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self.add_events(Event.by_groups([Group.GAMEPAD, Group.BUMPER, Group.IMU, Group.STOP, Group.VELOCITY]))
@@ -143,7 +151,7 @@ class MotionController(Subscriber):
         self._wind_down_ratio = 0.90
         self._minimum_speed = 0.20
         _ticks_per_rotation = 2774.64
-        _wheel_circumference = 2 * _wheel_diameter * PI # 364.42
+        _wheel_circumference = 2 * _wheel_diameter * π # 364.42
         # finish up…
         self._log.info('ready.')
 
@@ -178,14 +186,6 @@ class MotionController(Subscriber):
 
         :param message:  the message to process.
         '''
-#       if message.gcd:
-#           raise GarbageCollectedError('cannot process message: message has been garbage collected.')
-#       _event = message.event
-#       self._log.info('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
-#       await Subscriber.process_message(self, message)
-#       self._log.info('post-processing message {}'.format(message.name))
-#       if message.gcd:
-#           raise GarbageCollectedError('cannot process message: message has been garbage collected. [3]')
         _event = message.event
 #       self._log.debug('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         _value = message.value
@@ -197,13 +197,12 @@ class MotionController(Subscriber):
                 if self._motor_controller.is_stopped:
                     self._log.info('robot already stopped.')
                 else:
-                    self._log.info('handling STOP; value: {}'.format(_value))
+                    self._log.info('😨 handling STOP; value: {}'.format(_value))
                     self._stop_handler.process_message(message)
 
         elif _event.group is Group.BUMPER:
 #           self._log.info('handling BUMPER; value: {}'.format(type(_value)))
             _sensor_data = _value
-            # from hardware.sensor_array import SensorData
             _events = _sensor_data.events
             _fop_cm = _sensor_data.fop_cm
             _fos_cm = _sensor_data.fos_cm
@@ -248,9 +247,11 @@ class MotionController(Subscriber):
 
         elif _event_num == Event.R2_BUTTON.num: # R2_BUTTON = ( 48, "r2",         10, Group.GAMEPAD)
 #           self._handle_gamepad_R2_BUTTON(_value)
-            if _value == 0 and self._headlight:
-                self._log.info('handling R2_BUTTON; value: {} headlight toggle'.format(_value))
-                self._headlight.toggle()
+            if _value == 0:
+                self._log.info('handling R2_BUTTON; value: {} slow to stop'.format(_value))
+                self.brake()
+#               self.halt()
+#               self.stop()
 
         elif _event_num == Event.START_BUTTON.num: # START_BUTTON        = ( 49, "start",      10, Group.GAMEPAD)
             self._handle_gamepad_START_BUTTON(_value)
@@ -336,23 +337,25 @@ class MotionController(Subscriber):
         values.
         '''
 #       elif abs(self._afrs_angle) >= 45.0 and abs(inner_angle) >= 45.0: # if we're already at 45° then spin
-        self.set_steering_mode(SteeringMode.AFRS)
+        if self.get_steering_mode() is not SteeringMode.AFRS:
+            self.set_steering_mode(SteeringMode.AFRS)
+#       self.set_steering_mode(SteeringMode.AFRS)
         if value == -1: # decrement
             if self._steering_angle_index > SteeringAngle.COUNTER_CLOCKWISE_45.num:
                 self._steering_angle_index -= 1
                 self._steering_angle = SteeringAngle.from_index(self._steering_angle_index)
-                self._log.info(Style.NORMAL + '🥑 A1. decrement_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
+                self._log.info(Style.NORMAL + 'decrement_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
                 self._set_afrs_steering_angle_from_inner_angle(self._steering_angle.value)
             else:
-                self._log.info(Style.BRIGHT + '🥑 A2. IGNORE call to decrement_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
+                self._log.info(Style.BRIGHT + 'ignore call to decrement_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
         elif value == 1: # increment
             if self._steering_angle_index < SteeringAngle.CLOCKWISE_45.num:
                 self._steering_angle_index += 1
                 self._steering_angle = SteeringAngle.from_index(self._steering_angle_index)
-                self._log.info(Style.NORMAL + '🥑 B1. increment_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
+                self._log.info(Style.NORMAL + 'increment_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
                 self._set_afrs_steering_angle_from_inner_angle(self._steering_angle.value)
             else:
-                self._log.info(Style.BRIGHT + '🥑 B2. IGNORE call to increment_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
+                self._log.info(Style.BRIGHT + 'ignore call to increment_steering_angle: {}; value: {}'.format(self._steering_angle, self._steering_angle.value))
 
         self._log.info('steering angle: ' + Style.BRIGHT + '{}'.format(self._steering_angle.name) + Style.NORMAL + '; angle: {:.2f}°'.format(self._steering_angle.value))
 
@@ -369,6 +372,10 @@ class MotionController(Subscriber):
         We clamp the inner angle to -45°/45°.
         '''
         _inner_angle = int(Util.remap_range(value, 0, 255, -45, 45))
+        # check if we're already in AFRS mode
+        if self.get_steering_mode() is not SteeringMode.AFRS:
+            print('🔴 1. set_afrs_steering_angle  ')
+            self.set_steering_mode(SteeringMode.AFRS)
         self._set_afrs_steering_angle_from_inner_angle(_inner_angle)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -377,6 +384,7 @@ class MotionController(Subscriber):
         Gets the outer angle based on the inner angle and calls the
         servo controller to perform the move.
         '''
+        print('🦊 A.')
         if inner_angle != self._afrs_angle: # only pay attention to changes
             self.set_steering_mode(SteeringMode.AFRS)
 #           self._servo_controller.set_mode(SteeringMode.AFRS)
@@ -388,32 +396,37 @@ class MotionController(Subscriber):
             _style = Style.NORMAL
 #           self._afrs_max_ratio = _cfg.get('afrs_max_ratio') # ratio at maximum turn
             if inner_angle == 0: # no rotation
+                print('🦊 B. no rotation')
                 _style = Style.BRIGHT
-                _direction = 'STRAIGHT AHEAD'
+                _direction = Direction.AHEAD
                 _port_angle = 0.0
                 _stbd_angle = 0.0
                 self._port_motor_ratio = 1.0
                 self._stbd_motor_ratio = 1.0
+                Player.instance().play_from_thread(Sound.ZZT) # HZAH
 
             elif inner_angle < 0: # counter-clockwise (port is inner)
+                print('🦊 C. counter-clockwise')
                 _style = Fore.RED
-                _direction = 'counter-clockwise'
+                _direction = Direction.COUNTER_CLOCKWISE
                 self._port_motor_ratio = self.steering_translation(-1 * inner_angle)
                 self._stbd_motor_ratio = 1.0
                 _port_angle = inner_angle
                 _stbd_angle = _outer_angle
 
             else: # clockwise (stbd is inner)
+                print('🦊 D. clockwise')
                 _style = Fore.GREEN
-                _direction = 'clockwise'
+                _direction = Direction.CLOCKWISE
                 self._port_motor_ratio = 1.0
                 self._stbd_motor_ratio = self.steering_translation(inner_angle)
                 _port_angle = _outer_angle
                 _stbd_angle = inner_angle
 
+#           print('port angle: {}; stbd angle: {}'.format(_port_angle, _stbd_angle))
             self._servo_controller.set_afrs_angle(_port_angle, _stbd_angle)
 
-            self._log.info('turning: ' + _style + '{} '.format(_direction) + Fore.CYAN + Style.NORMAL + 'inner angle: {}°; '.format(inner_angle)
+            self._log.info('turning: ' + _style + '{} '.format(_direction.name) + Fore.CYAN + Style.NORMAL + 'inner angle: {}°; '.format(inner_angle)
                     + Fore.RED + 'port: {}°; ratio: {:.2f}; '.format(_port_angle, self._port_motor_ratio)
                     + Fore.GREEN + 'stbd: {}°; ratio: {:.2f}'.format(_stbd_angle, self._stbd_motor_ratio))
 
@@ -424,7 +437,7 @@ class MotionController(Subscriber):
             self._stbd_motor_ratio = 1.0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def reposition(self, steering_mode, callback):
+    def reposition(self, steering_mode, callback=None):
         '''
         Reposition for a steering mode change, with a coordinated motor
         movement to avoid dragging the wheels.
@@ -434,20 +447,24 @@ class MotionController(Subscriber):
         to the top rotational speed. Once half-way, ramp down.
         '''
         _is_daemon = True
-        _t_saft = Thread(target = self._reposition_motors, args=[steering_mode, callback], name='reposition', daemon=_is_daemon)
+        _repo_thread = Thread(target = self._reposition_motors, args=[steering_mode, callback], name='reposition', daemon=_is_daemon)
+        _repo_thread.start()
+        # initial delay to let servos catch up
+        time.sleep(self._initial_reposition_delay_sec)
         # set servos to ROTATE position
         if steering_mode  is SteeringMode.ROTATE:
             self._log.info('repositioning for rotation')
-            self._servo_controller.set_mode(SteeringMode.ROTATE, 0.3)
+            self._servo_controller.set_mode(SteeringMode.ROTATE, callback)
         else:
             self._log.info('repositioning for skid/afsr steering')
-            self._servo_controller.set_mode(SteeringMode.SKID, 0.3)
-        _t_saft.start()
+            self._servo_controller.set_mode(SteeringMode.SKID, callback)
+        # wait til thread has finished
+        _repo_thread.join()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _reposition_motors(self, steering_mode):
+    def _reposition_motors(self, steering_mode, callback):
         # ten steps up, ten steps down = 20 steps
-        _step_delay_sec = self._reposition_time_delay_sec / 20.0
+        _step_delay_sec = self._reposition_delay_sec / 20.0
         _min_speed = 0.09 # ~Chadburn.DEAD_SLOW 0.07
         _max_speed = Chadburn.SLOW_AHEAD.speed # 0.21
         _speed_step = ( _max_speed - _min_speed ) / 10.0
@@ -466,6 +483,15 @@ class MotionController(Subscriber):
         self._motor_controller.set_speed(Orientation.STBD, 0.0)
         self._motor_controller.reposition(Rotation.STOPPED)
         self._log.info('repositioning complete.')
+        if callback is not None:
+            callback()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def get_target_speed(self):
+        '''
+        Returns the scaled target speed from the digital potentiometer.
+        '''
+        return self._digital_pot.get_scaled_value()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def change_speed(self, value):
@@ -647,22 +673,18 @@ class MotionController(Subscriber):
 
     def task3(self):
 #       self._log.info(Fore.GREEN + 'processing task 3…')
-        self._log.info(Fore.GREEN + 'heading north…')
         self.set_heading(Rotation.CLOCKWISE, Cardinal.NORTH)
 
     def task4(self):
 #       self._log.info(Fore.GREEN + 'processing task 4…')
-        self._log.info(Fore.GREEN + 'heading east…')
         self.set_heading(Rotation.CLOCKWISE, Cardinal.EAST)
 
     def task5(self):
 #       self._log.info(Fore.GREEN + 'processing task 5…')
-        self._log.info(Fore.GREEN + 'heading south…')
         self.set_heading(Rotation.CLOCKWISE, Cardinal.SOUTH)
 
     def task6(self):
         self._log.info(Fore.GREEN + 'processing task 6…')
-        self._log.info(Fore.GREEN + 'heading west…')
         self.set_heading(Rotation.CLOCKWISE, Cardinal.WEST)
 
     def task7(self):
@@ -720,8 +742,11 @@ class MotionController(Subscriber):
         '''
         Rotate the robot so that it is heading in the specified cardinal direction.
         '''
+        print('❎ a.')
         if not self._digital_pot:
             raise Exception('cannot proceed: no digital potentiometer available.')
+        print('\n\n\n\n')
+        self._log.info(Fore.GREEN + 'heading {}…'.format(cardinal.label))
         self._prepare_to_move()
         # this is somehow necessary as Ctrl-C isn't normally getting caught in this loop.
         signal.signal(signal.SIGINT, self._rotate_sigint_handler)
@@ -729,10 +754,14 @@ class MotionController(Subscriber):
         _ACTIVATE_MOTION = True
         self._log.info('turning ' + Fore.YELLOW + '{}'.format(rotation.label) + Fore.CYAN + ' to heading ' + Fore.YELLOW + '{}…'.format(cardinal.label))
         if self._imu is None:
-            raise Exception('cannot calibrate: IMU has not been set.')
+            raise Exception('cannot set heading: IMU has not been set.')
         _icm20948 = self._imu.icm20948
-        if not _icm20948.enabled:
-            _icm20948.enable()
+        if not _icm20948.is_calibrated:
+            raise Exception('cannot set heading: IMU has not been calibrated.')
+        print('❎ b.')
+
+        _icm20948.poll()
+
         _starting_heading = _icm20948.heading
         _target_heading = cardinal.degrees
         _diff_deg = Convert.difference_in_degrees(_starting_heading, _target_heading)
@@ -741,24 +770,28 @@ class MotionController(Subscriber):
 
         _target_speed = self._digital_pot.get_scaled_value() # values 0.0-1.0
 
+        print('❎ c. target speed: {}'.format(_target_speed))
         # change to rotate mode ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         if _ACTIVATE_MOTION:
+            print('❎ d.')
             self.set_steering_mode(SteeringMode.ROTATE)
             time.sleep(3) # wait until the servos are clearly finished moving
             # add rotation lambdas
             self._motor_controller.rotate(Rotation.CLOCKWISE)
 
-        _min_speed_clamp = lambda n: max(min(Chadburn.DEAD_SLOW_AHEAD.speed, n), Chadburn.DEAD_SLOW_ASTERN.speed)
-        _max_speed_clamp = lambda n: max(min(Chadburn.HALF_AHEAD.speed, n), Chadburn.HALF_ASTERN.speed)
+#       _min_speed_clamp = lambda n: max(min(Chadburn.DEAD_SLOW_AHEAD.speed, n), Chadburn.DEAD_SLOW_ASTERN.speed)
+#       _max_speed_clamp = lambda n: max(min(Chadburn.HALF_AHEAD.speed, n), Chadburn.HALF_ASTERN.speed)
+        print('❎ e.')
         try:
             _hz = 20
             _rate = Rate(_hz, Level.ERROR)
 
             while not isclose(_diff_deg, 0.0, abs_tol=1.0):
-
                 _target_speed = self._digital_pot.get_scaled_value() # values 0.0-1.0
+                print('❎ f. looping; target speed: {}'.format(_target_speed))
                 _icm20948.poll()
                 _current_heading = _icm20948.heading
+                print('❎ g. looping; heading: {}'.format(_current_heading))
                 _diff_deg = Convert.difference_in_degrees(_current_heading, _target_heading)
                 _multiplier = _diff_deg / 180.0
                 _target_speed *= _multiplier
@@ -771,15 +804,18 @@ class MotionController(Subscriber):
                             + Fore.YELLOW + 'heading: {:4.2f}; target: {:4.2f}; diff: {:4.2f}; '.format(_current_heading, _target_heading, _diff_deg)
                             + Fore.GREEN + 'multiplier: {:4.2f}'.format(_multiplier))
                 else:
-                    _clamped_speed = _max_speed_clamp(_target_speed) # we never want to go faster than ONE_THIRD
-                    _clamped_speed = _min_speed_clamp(_clamped_speed) # we never want to go slower than DEAD_SLOW
-                    self._motor_controller.set_speed(Orientation.PORT, _clamped_speed)
-                    self._motor_controller.set_speed(Orientation.STBD, _clamped_speed)
+                    _clamped_speed = 0.0 # TEMP unused
+#                   _clamped_speed = _max_speed_clamp(_target_speed) # we never want to go faster than ONE_THIRD
+#                   _clamped_speed = _min_speed_clamp(_clamped_speed) # we never want to go slower than DEAD_SLOW
+                    self._motor_controller.set_speed(Orientation.PORT, _target_speed)
+                    self._motor_controller.set_speed(Orientation.STBD, _target_speed)
                     self._log.info(Fore.CYAN + 'target/clamped speed: {:.2f}/{:4.2f}; '.format(_target_speed, _clamped_speed)
                             + Fore.YELLOW + 'heading: {:4.2f}; target: {:4.2f}; diff: {:4.2f}; '.format(_current_heading, _target_heading, _diff_deg)
                             + Fore.GREEN + 'multiplier: {:4.2f}'.format(_multiplier))
+                print('❎ h. end of loop')
                 _rate.wait()
 #               time.sleep(0.2)
+            print('❎ z. done.')
 
         except KeyboardInterrupt:
             self_log.info('Ctrl-C caught; exiting…')
@@ -807,7 +843,7 @@ class MotionController(Subscriber):
                 self._sensor_array.suppress_events(None)
         else:
             if self._sensor_array:
-                # suppress bumpers while rotating
+                # suppress bumpers while rotating TODO we only need to suppress two of the bumpers, not all four
                 self._sensor_array.suppress_events([
                     Event.BUMPER_PFWD,
                     Event.BUMPER_PAFT,
@@ -818,155 +854,161 @@ class MotionController(Subscriber):
             self._motor_controller.rotate(rotation)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _calibrate_movement(self):
-        '''
-        Performs the physical movement of rotating the robot clockwise through
-        a complete circle, mimicking the accumulation of statistics to determine
-        following the rotation if the values have approached stability.
-        '''
-        self._log.info(Fore.YELLOW + '😨 a. begin calibration loop...')
-        if self._imu is None:
-            raise Exception('cannot calibrate: IMU has not been set.')
-        _icm20948 = self._imu.icm20948
-
-        self._log.info(Fore.YELLOW + '😨 b. ')
-        self.set_steering_mode(SteeringMode.ROTATE)
-#       self.reposition(SteeringMode.ROTATE)
-
-        time.sleep(3) # wait until the servos are clearly finished moving
-
-        if not _icm20948.enabled:
-            _icm20948.enable()
-        self._log.info(Fore.GREEN + 'ICM20948 enabled: {}'.format(_icm20948.enabled))
-
-        self.rotate(Rotation.CLOCKWISE)
-
-        i = 0
-        _hz = 20
-        _rate = Rate(_hz, Level.ERROR)
-
-        _max_delta = 380.0
-        _diff = 0.0
-        _delta = 0.0
-        _initial_heading = _icm20948.uncalibrated_heading
-
-        _counter = itertools.count()
-        _count = 0
-
-        # choose a motor
-        _motor = self._motor_controller.get_motor(Orientation.SAFT)
-        _step_count = 0
-        _steps = _motor.steps
-        self._log.info(Fore.GREEN + 'INITIAL heading value: {:4.2f}°; {} steps.'.format(_initial_heading, _steps))
-        _step_limit = 400000 # roughly one rotation
-
-        while _step_count < _step_limit:
-            _count = next(_counter)
-            # when rotating clockwise, the heading value should only increase...
-            _steps = _motor.steps
-            _step_count += abs(_steps)
-            _heading = _icm20948.uncalibrated_heading
-            # add to queue
-            if _icm20948.calibration_check(_heading):
-                self._log.info(Fore.GREEN + Style.BRIGHT + 'IMU was calibrated while moving.')
-#               break
-            self._log.info(Fore.GREEN + '[{:d}] heading: {:4.2f}°; {} steps; count: {}/{} steps;'.format(i, _heading, _steps, _step_count, _step_limit)
-                    + Fore.YELLOW + ' calibrated? {}'.format(_icm20948.is_calibrated))
-            i += 1
-            _rate.wait()
-            # end loop ......................................................
-
-        self._log.info('exited loop.')
-
-        self.rotate(Rotation.STOPPED)
-#       self.reposition(SteeringMode.AFRS)
-        # in theory we should be re-enabling bumpers after 'taking a break'
-
-        # recenter before proceeding...
-        self._log.info('recentering…')
-        self._servo_controller.recenter()
-        self._log.info('recentered.')
-
-        if not self._motor_controller.all_motors_are_stopped:
-            self._motor_controller.stop()
-
-        self._log.info('taking a break…')
-        time.sleep(3)
-
-        if _icm20948.is_calibrated:
-            self._log.info(Fore.GREEN + 'IMU has been calibrating.')
-            if self._play_sound:
-                self._player.play(Sound.CHATTER_4)
-            # enable monitor
-            if self._monitor:
-                self._monitor.set_callback(_icm20948._formatted_heading)
-        else:
-            self._log.warning(Fore.GREEN + 'unable to calibrate IMU.')
-
-        self._log.info(Fore.GREEN + 'calibrate loop end. ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ ')
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_imu(self, imu):
         '''
         Set the IMU used by the MotionController.
         '''
         self._imu = imu
 
+    @property
+    def imu(self):
+        return self._imu
+
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def calibrate_imu(self):
+    def check_calibration(self, callback=None):
         '''
-        Perform a 360° rotation to calibrate the ICM20948.
+        Checks the current status of the IMU's calibration, executing
+        the callback upon completion.
         '''
         if self._play_sound:
             self._player.play(Sound.CHATTER_2)
-        self._log.info(Style.BRIGHT + 'calibrating IMU…')
-        self._calibrate_loop_thread = Thread(name='calibrate_thread', target=MotionController._calibrate_movement, args=[self], daemon=True)
-        self._calibrate_loop_thread.start()
+        self._calibrated = None # clear any existing status
+        _calibrator = Calibrator(self._config, self, Level.INFO)
+        _calibrator.check_calibration()
+        _hz = 10
+        _rate = Rate(_hz, Level.ERROR)
+        while self.calibrated is None:
+            _rate.wait()
+        if callback:
+            callback()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def calibrate_imu(self, callback=None):
+        if self._imu:
+            _icm20948 = self._imu.icm20948
+            if not _icm20948.enabled:
+                _icm20948.enable()
+            self._log.info('🐮 calibrating IMU…')
+            if not _icm20948.is_calibrated:
+                _cfg = self._config['mros'].get('hardware').get('icm20948')
+                if _cfg.get('motion_calibrate'):
+                    self._calibrate_imu()
+                elif _cfg.get('bench_calibrate'):
+                    _icm20948.calibrate()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _calibrate_imu(self, callback=None):
+        '''
+        Perform a 360° rotation to calibrate the ICM20948, executing
+        the callback upon completion.
+
+        This method is not meant to be called directly, use
+        calibrate_imu() instead.
+        '''
+        _calibrator = Calibrator(self._config, self, Level.INFO)
+        _calibrator.calibrate()
+        _hz = 10
+        _rate = Rate(_hz, Level.ERROR)
+        while self.calibrated is None:
+            _rate.wait()
+        if callback:
+            callback()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def set_calibrated(self):
+        '''
+        Waits a few seconds and then checks to see if the ICM20948 is calibrated.
+        '''
+        self._log.info('checking calibration status…')
+        _icm20948 = self.imu.icm20948
+        if _icm20948.is_calibrated:
+            self._calibrated = True
+            self._log.info(Fore.GREEN + 'IMU has been calibrating.')
+            if self._play_sound:
+                self._player.play_from_thread(Sound.SONIC_BAT)
+            # enable monitor
+            if self._monitor:
+                self._monitor.set_callback(_icm20948._formatted_heading)
+        else:
+            self._calibrated = False
+            if self._play_sound:
+                self._player.play_from_thread(Sound.BZAT)
+            self._log.warning(Fore.GREEN + 'unable to calibrate IMU.')
+
+    @property
+    def calibrated(self):
+        '''
+        Returns the calibration state of the IMU, either None, True or False.
+        '''
+        return self._calibrated
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _set_steering_mode_callback(self):
+        self._log.info(Fore.MAGENTA + '_set_steering_mode_callback ............................')
+        pass
+
+    def get_steering_mode(self):
+        return self._steering_mode
+
     def set_steering_mode(self, steering_mode):
         '''
         Set the steering mode of the motors and servos to the argument.
         '''
+        print('💙 a. set steering mode: {}'.format(steering_mode))
+        _alter_steering_mode = True
         if steering_mode is None:
             raise ValueError('null steering mode argument.')
-        if self._steering_mode is steering_mode:
+        elif self._steering_mode is steering_mode:
             self._log.info(Style.DIM + 'no change: already in steering mode {}'.format(self._steering_mode))
+            print('💙 b. no change')
+            _alter_steering_mode = False
             return
-        # NOTE: remove any lambdas not part of the current mode
-        for _motor in self._motor_controller.get_motors():
-            if _motor.has_speed_multiplier('steering'):
-                self._log.info(Fore.GREEN + Style.BRIGHT + 'removing existing steering mode or stop lambda from {} motor…'.format(_motor.orientation.name))
-                _motor.remove_speed_multiplier('steering') # remove any other steering mode lambdas
-                _motor.remove_speed_multiplier('stop')     # remove any stop lambdas
+        _rotated = self._servo_controller.is_rotated
+        if steering_mode is SteeringMode.ROTATE and _rotated:
+            self._log.info(Style.DIM + 'already in ROTATE steering mode {}'.format(self._steering_mode))
+            print('💙 c. already ROTATE ')
+            _alter_steering_mode = False
+#           return
+        elif steering_mode is not SteeringMode.ROTATE and not _rotated:
+            self._log.info(Style.DIM + 'already in non-rotated steering mode {}'.format(self._steering_mode))
+            print('💙 d. already non-ROTATE ')
+            _alter_steering_mode = False
+#           return
+
+        if _alter_steering_mode:
+            self._log.info(Fore.GREEN + 'setting steering mode to {}'.format(steering_mode))
+            # NOTE: remove any lambdas not part of the current mode
+            for _motor in self._motor_controller.get_motors():
+                if _motor.has_speed_multiplier('steering'):
+                    self._log.info(Fore.GREEN + Style.BRIGHT + 'removing existing steering mode or stop lambda from {} motor…'.format(_motor.orientation.name))
+                    _motor.remove_speed_multiplier('steering') # remove any other steering mode lambdas
+                    _motor.remove_speed_multiplier('stop')     # remove any stop lambdas
+            # alter steering servos for mode
+            self.reposition(steering_mode, self._set_steering_mode_callback)
+
+        print('💙 e.')
         # set mode for motors
         if steering_mode is SteeringMode.AFRS:
-            self._servo_controller.recenter() # recenter before proceeding...
-
-            print('set AFRS mode....')
+            print('💙 f. AFRS...')
             self._steering_mode = SteeringMode.AFRS
-            self._servo_controller.set_mode(steering_mode)
-            # add steering lambdas if they're not already added
             for _motor in self._motor_controller.get_motors():
+                print('💙 g. for motor: {}'.format(_motor))
                 if _motor.orientation.side is Orientation.PORT:
                     if not _motor.has_speed_multiplier(MotionController.PORT_AFRS_STEERING_LAMBDA_NAME):
+                        print('💙 h. PORT')
                         _motor.add_speed_multiplier(MotionController.PORT_AFRS_STEERING_LAMBDA_NAME, self._port_steering_lambda)
                 elif _motor.orientation.side is Orientation.STBD:
                     if not _motor.has_speed_multiplier(MotionController.STBD_AFRS_STEERING_LAMBDA_NAME):
+                        print('💙 i. STBD')
                         _motor.add_speed_multiplier(MotionController.STBD_AFRS_STEERING_LAMBDA_NAME, self._stbd_steering_lambda)
                 else:
                     raise Exception('unrecognised orientation {}'.format(_motor.orientation.name))
         elif steering_mode is SteeringMode.ROTATE:
-            self._log.info(Fore.MAGENTA + '🍉 setting rotate mode {}'.format(steering_mode))
+            print('💙 j. ROTATE')
             self._steering_mode = SteeringMode.ROTATE
-            self._servo_controller.set_mode(steering_mode)
-            # TODO
-            pass
         elif steering_mode is SteeringMode.SKID:
+            print('💙 k. SKID')
             self._steering_mode = SteeringMode.SKID
-            self._servo_controller.set_mode(steering_mode)
-            # TODO
-            pass
         else:
             raise Exception('unsupported steering mode: {}'.format(steering_mode.name))
 
@@ -1002,33 +1044,35 @@ class MotionController(Subscriber):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _prepare_to_move(self):
         '''
-        Make any preparations prior to moving the robot.
+        Make any preparations prior to moving the robot, including clearing
+        any preexisting speed multipliers.
         '''
-        self._log.info(Fore.WHITE + 'preparing to move…')
-        if self._monitor:
-            self._monitor.disable()
-        if self._screen:
-            self._screen.disable()
+        if self._suppress_monitors:
+            if self._monitor:
+                self._monitor.disable()
+            if self._screen:
+                self._screen.disable()
+        self._motor_controller.clear_speed_multipliers()
+        self._log.info('prepared to move.')
         # make a noise?
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _state_changed(self):
         self._log.info('ready.')
-        _currently_is_stopped = self._motor_controller.is_stopped
-        if _currently_is_stopped:
+        if self._motor_controller.is_stopped:
             self._log.info('state: stopped.')
+            if self._suppress_monitors:
+                if self._monitor:
+                    self._monitor.enable()
+                if self._screen:
+                    self._screen.enable()
         else:
             self._log.info('state: moving.')
-        if self._monitor:
-            if _currently_is_stopped:
-                self._monitor.enable()
-            elif self._monitor.enabled:
-                self._monitor.disable()
-        if self._screen:
-            if _currently_is_stopped:
-                self._screen.enable()
-            else:
-                self._screen.disable()
+            if self._suppress_monitors:
+                if self._monitor:
+                    self._monitor.disable()
+                if self._screen:
+                    self._screen.disable()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _shutdown(self):
@@ -1043,6 +1087,10 @@ class MotionController(Subscriber):
         '''
         Enables the motors. This issues a warning if already enabled, but no
         harm is done in calling it repeatedly.
+
+        Once enabled, if there is an IMU present it is calibrated, either via
+        a prescribed motion or, if on the bench, manually rotating the robot
+        horizontally through 360°, the choice depending on configuration.
         '''
         if not self.closed:
             if not self.enabled:
@@ -1052,10 +1100,49 @@ class MotionController(Subscriber):
                 self._servo_controller.enable()
                 Subscriber.enable(self)
                 self._log.info('motion controller enabled.')
+                if self._initial_calibration:
+                    # we're ready to calibrate the IMU now…
+                    self.wait_til_pushbutton(self.calibrate_imu)
             else:
                 self._log.warning('motion controller already enabled.')
         else:
             self._log.warning('motion controller closed.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def wait_til_pushbutton(self, callback):
+        '''
+        Waits until the push button before executing the callback.
+        '''
+        _is_daemon = True
+        _wait_thread = Thread(target = self._wait_til_pushbutton, args=[callback], name='wait-for-pushbutton', daemon=_is_daemon)
+        _wait_thread.start()
+
+    def _wait_til_pushbutton(self, callback):
+        Player.instance().play(Sound.TWIDDLE_POP)
+        _btn = PushButton(self._config, Level.INFO)
+        self._log.info(Fore.YELLOW + 'waiting for push button…')
+        while not _btn.pushed():
+            time.sleep(0.1)
+        # debounce
+        while _btn.pushed() is True:
+            time.sleep(0.05)
+        time.sleep(1.0)
+        callback()
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def brake(self):
+        _braked_lambda = lambda: self._log.info("🍀 brake complete.")
+        self._stop_handler.brake(callback=_braked_lambda)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def halt(self):
+        _halted_lambda = lambda: self._log.info("🍀 halt complete.")
+        self._stop_handler.halt(callback=_halted_lambda)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def stop(self):
+        _stopped_lambda = lambda: self._log.info("🍀 stop complete.")
+        self._stop_handler.stop(callback=_stopped_lambda)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable(self):
@@ -1064,6 +1151,8 @@ class MotionController(Subscriber):
         '''
         if not self.closed:
             if self.enabled:
+                if self._slow_to_stop:
+                    self.halt()
                 self._log.info('disabling motion controller…')
                 self._motor_controller.disable()
                 self._servo_controller.disable()
@@ -1079,6 +1168,7 @@ class MotionController(Subscriber):
         '''
         Closes both the motors and servos.
         '''
+        print('🍊 motion controller close.')
         if not self.closed:
             Subscriber.close(self) # calls disable
             self._log.info('motion controller closed.')

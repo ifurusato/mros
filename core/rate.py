@@ -7,7 +7,7 @@
 #
 # author:   Murray Altheim
 # created:  2020-08-23
-# modified: 2021-02-05
+# modified: 2024-08-07 - using time.perf_counter()
 #
 
 import time
@@ -29,7 +29,7 @@ class Rate():
     def __init__(self, hertz, level=Level.INFO, use_ns=False):
         self._log = Logger('rate', level)
         self._last_ns   = time.perf_counter_ns()
-        self._last_time = time.time()
+        self._last_time = time.perf_counter()
         self._dt_s = 1/hertz
         self._dt_ms = self._dt_s * 1000
         self._dt_ns = self._dt_ms * 1000000
@@ -96,7 +96,7 @@ class Rate():
         '''
         Return True if still waiting for the current loop to complete.
         '''
-        return self._dt_s < ( time.time() - self._last_time )
+        return self._dt_s < ( time.perf_counter() - self._last_time )
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def wait(self):
@@ -121,7 +121,7 @@ class Rate():
                 time.sleep(_delay_sec)
             self._last_ns = time.perf_counter_ns()
         else:
-            _diff = time.time() - self._last_time
+            _diff = time.perf_counter() - self._last_time
             _delay_sec = self._dt_s - _diff
             # adjust for error
             if _delay_sec + self._trim > 0.0:
@@ -130,6 +130,6 @@ class Rate():
                 time.sleep(_delay_sec)
             else:
                 self._log.debug('no additional delay in rate loop (diff: {:7.4f}ms)'.format(_diff * 1000.0))
-            self._last_time = time.time()
+            self._last_time = time.perf_counter()
 
 #EOF

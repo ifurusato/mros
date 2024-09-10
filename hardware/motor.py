@@ -158,7 +158,7 @@ class Motor(Component):
         if name in self.__speed_lambdas:
             self._log.warning('motor already contains a \'{}\' lambda.'.format(name))
         else:
-#           self._log.info('adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
+            self._log.info('🐟 adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
             self.__speed_lambdas[name] = lambda_function
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈

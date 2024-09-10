@@ -13,6 +13,7 @@
 import traceback
 import itertools
 import math, statistics
+from math import pi as π
 from collections import deque
 from datetime import datetime as dt
 from colorsys import hsv_to_rgb
@@ -25,22 +26,21 @@ from matrix11x7 import Matrix11x7
 from matrix11x7.fonts import font3x5, font5x5, font5x7, font5x7smoothed
 
 from core.cardinal import Cardinal
+from core.convert import Convert
 from core.component import Component
 from core.logger import Logger, Level
 from core.orientation import Orientation
 from core.rate import Rate
 from core.ranger import Ranger
-from core.config_loader import ConfigLoader
-from hardware.i2c_scanner import I2CScanner, DeviceNotFound
-from hardware.digital_pot import DigitalPotentiometer
 from hardware.rgbmatrix import RgbMatrix, DisplayType
 from hardware.sound import Sound
 from hardware.player import Player
 
-IN_MIN  = 0.0  # minimum analog value from IO Expander
-IN_MAX  = 3.3  # maximum analog value from IO Expander
-OUT_MIN = -1.0 * math.pi # minimum scaled output value
-OUT_MAX = math.pi        # maximum scaled output value
+IN_MIN  = 0.0      # minimum analog value from IO Expander
+IN_MAX  = 3.3      # maximum analog value from IO Expander
+OUT_MIN = -1.0 * π # minimum scaled output value
+OUT_MAX = π        # maximum scaled output value
+HALF_PI = π / 2.0
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Icm20948(Component):
@@ -94,14 +94,6 @@ class Icm20948(Component):
             self._digital_pot = self._component_registry.get('digital-pot-0x0E')
             if self._digital_pot:
                 self._digital_pot.set_output_range(OUT_MIN, OUT_MAX)
-#           _i2c_scanner = I2CScanner(config, level=level)
-#           if _i2c_scanner.has_hex_address(['0x0E']):
-#               self._log.info('using digital potentiometer…')
-#               self._digital_pot = DigitalPotentiometer(config, level=level)
-#               self._digital_pot.set_input_range(IN_MIN, IN_MAX)
-#               self._digital_pot.set_output_range(OUT_MIN, OUT_MAX)
-#           else:
-#               raise Exception('no digital potentiometer available.')
         # add numeric display ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._low_brightness    = 0.15
         self._medium_brightness = 0.25
@@ -122,13 +114,15 @@ class Icm20948(Component):
         self._axes = self._Z, self._Y
         # queue for stability check stats ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._stdev = 0.0
-        _queue_len = _cfg.get('queue_length') # also affects how fast mean catches up to data
-        self._queue = deque(_queue_len*[0], _queue_len)
+        self._queue_length = _cfg.get('queue_length') # also affects how fast mean catches up to data
+#       self._queue = deque(self._queue_length*[0], self._queue_length)
+        self._queue = deque([], self._queue_length)
         self._stability_threshold = _cfg.get('stability_threshold')
         # misc/variables ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        self._heading_count = 0
         self._display_rate = 20 # display every 10th set of values
         self._poll_rate_hz = _cfg.get('poll_rate_hz')
-        self._radians = 0.0
+        self._radians = None
         self._amin = None
         self._amax = None
         self._pitch = 0.0
@@ -136,7 +130,7 @@ class Icm20948(Component):
         self._heading = 0
         self._formatted_heading = lambda: 'Heading: {:d}°'.format(self._heading)
         self._mean_heading = 0
-        self._mean_heading_radians = 0.0
+        self._mean_heading_radians = None
         self._accel = [0.0, 0.0, 0.0]
         self._gyro =  [0.0, 0.0, 0.0]
         self._include_accel_gyro = _cfg.get('include_accel_gyro')
@@ -144,6 +138,11 @@ class Icm20948(Component):
         # instantiate sensor class  ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self.__icm20948 = ICM20948(i2c_addr=_cfg.get('i2c_address'))
         self._log.info('ready.')
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @property
+    def queue_length(self):
+        return self._queue_length
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -165,21 +164,50 @@ class Icm20948(Component):
         self._is_calibrated = calibrated
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def is_cardinal_aligned(self):
+    def is_cardinal_aligned(self, cardinal=None):
         '''
         Returns True if the mean heading is aligned within a 3° tolerance to
-        one of the four cardinal directions.
+        the specified cardinal directory, or if the argument is None, any of
+        the four cardinal directions.
         '''
-        if math.isclose(self._mean_heading_radians, Cardinal.NORTH.radians, abs_tol=self._cardinal_tolerance):
+        if self._mean_heading_radians is None:
+            return False
+        _angle = self._mean_heading_radians
+        _degrees = int(Convert.to_degrees(_angle))
+        if cardinal is None:
+            print('angle: {:4.2f}r / {:d}°; cardinal: not provided'.format(_angle, _degrees))
+        else:
+            print('angle: {:4.2f}r / {:d}°; cardinal: {:4.2f}'.format(_angle, _degrees, cardinal.radians))
+        if (( cardinal is None or cardinal is Cardinal.NORTH )
+                    and math.isclose(_angle, Cardinal.NORTH.radians, abs_tol=self._cardinal_tolerance)):
             return True
-        elif math.isclose(self._mean_heading_radians, Cardinal.WEST.radians, abs_tol=self._cardinal_tolerance):
+        elif (( cardinal is None or cardinal is Cardinal.WEST )
+                    and math.isclose(_angle, Cardinal.WEST.radians, abs_tol=self._cardinal_tolerance)):
             return True
-        elif math.isclose(self._mean_heading_radians, Cardinal.SOUTH.radians, abs_tol=self._cardinal_tolerance):
+        elif (( cardinal is None or cardinal is Cardinal.SOUTH )
+                    and math.isclose(_angle, Cardinal.SOUTH.radians, abs_tol=self._cardinal_tolerance)):
             return True
-        elif math.isclose(self._mean_heading_radians, Cardinal.EAST.radians, abs_tol=self._cardinal_tolerance):
+        elif (( cardinal is None or cardinal is Cardinal.EAST )
+                    and math.isclose(_angle, Cardinal.EAST.radians, abs_tol=self._cardinal_tolerance)):
             return True
         else:
             return False
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def difference_from_cardinal(self, cardinal):
+        '''
+        Returns the difference between the current heading and the provided
+        Cardinal direction, in radians.
+        '''
+        return Convert.get_offset_from_cardinal(self.heading_radians, cardinal)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def ratio_from_cardinal(self, cardinal):
+        '''
+        Returns a ratio (range: 0.0-1.0) between the current heading and the
+        provided Cardinal direction.
+        '''
+        return Convert.get_offset_from_cardinal(self.heading_radians, cardinal) / HALF_PI
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def disable_displays(self):
@@ -306,10 +334,14 @@ class Icm20948(Component):
         through a 360° motion, then leave it to rest for a few seconds. This
         times out after 60 seconds.
 
+        There is a ballistic behaviour in MotionController to perform this
+        same function.
+
         Returns True or False upon completion (in addition to setting the
         class variable).
         '''
         _start_time = dt.now()
+        self._heading_count = 0
         _rate = Rate(self._poll_rate_hz, Level.ERROR)
         _ranger = Ranger(0.0, 180.0, 0.0, 0.5)
         _counter = itertools.count()
@@ -333,7 +365,7 @@ class Icm20948(Component):
                 r, g, b = [int(c * 255.0) for c in hsv_to_rgb(_heading / 360.0, 1.0, 1.0)]
                 if self.calibration_check(_heading):
                     break
-                if _count % 10 == 0:
+                if self._rgbmatrix5x5 and _count % 10 == 0:
                     self._rgbmatrix.set_random_delay_sec(_ranger.convert(self._stdev)) # speeds up random display as stdev shrinks
                     self._log.info(Fore.CYAN + '[{:d}] trying to calibrate… stdev: {:4.2f}; '.format(_count, self._stdev) + Style.DIM + '(calibrated? {}; over limit? {})'.format(
                             self.is_calibrated, _count > _limit))
@@ -354,35 +386,55 @@ class Icm20948(Component):
         return self.is_calibrated
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def clear_queue(self):
+        '''
+        Clears the statistic queue.
+        '''
+        self._queue.clear()
+#       for _ in range(100): # ...by populating it with zeros.
+#           self._queue.append(0)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def calibration_check(self, heading):
         '''
         Adds a heading value to the queue and checks to see if the IMU is
         calibrated, according to the contents of the queue having a standard
         deviation less than a set threshold.
+
+        Note that this does not clear the queue.
         '''
         self._queue.append(heading)
+        self._heading_count += 1
+        if len(self._queue) < self._queue_length: # we only calibrate after the queue is full
+            return False
         self._stdev = statistics.stdev(self._queue)
+#       self._log.info('added heading of {:4.2f} to queue of {:d} values in queue with stdev of: {:5.3f}.'.format(heading, self._heading_count, self._stdev))
         if self._stdev < self._stability_threshold: # stable? then permanently flag as calibrated
-            self._is_calibrated = True
+            self.set_is_calibrated(True)
         return self._is_calibrated
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def scan(self):
+    def scan(self, enabled=None, callback=None):
         '''
-        This starts a loop that will repeat until the application exits. For
-        a single read of the sensor use poll().
+        This starts a loop that will repeat until the application exits or
+        until the optional enabled flag becomes False. For a single read of
+        the sensor use poll().
+
+        The optional callback will be executed upon each loop.
 
         Note: calling this method will fail if not previously calibrated.
         '''
         _rate = Rate(self._poll_rate_hz, Level.ERROR)
         if self._amin is None or self._amax is None:
             raise Exception('compass not calibrated yet, call calibrate() first.')
-        while True:
+        while enabled():
             if self._adjust_trim:
                 self._trim = self._digital_pot.get_scaled_value(False)
                 if self._show_rgbmatrix5x5:
                     self._digital_pot.set_rgb(self._digital_pot.value)
-            self.poll(self._counter)
+            self.poll()
+            if callback:
+                callback()
             _rate.wait()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -393,13 +445,15 @@ class Icm20948(Component):
 
         Note: calling this method will fail if not previously calibrated.
         '''
+        if not self.is_calibrated:
+            raise Exception('IMU is not calibrated.')
         try:
             self._heading = self._read_heading(self._amin, self._amax)
             # add to queue to calculate mean heading
             self._queue.append(self._heading)
             self._stdev = statistics.stdev(self._queue)
             if self._stdev < self._stability_threshold: # stable? then permanently flag as calibrated
-                self._is_calibrated = True
+                self.set_is_calibrated(True)
             self._mean_heading = statistics.mean(self._queue)
             self._mean_heading_radians = math.radians(self._mean_heading)
             if next(self._counter) % self._display_rate == 0: # display every 10th set of values

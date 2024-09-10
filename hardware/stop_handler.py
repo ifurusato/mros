@@ -10,6 +10,9 @@
 # modified: 2024-06-24
 #
 
+import time
+from datetime import datetime as dt
+import itertools
 from math import isclose
 from colorama import init, Fore, Style
 init(autoreset=True)
@@ -21,7 +24,9 @@ from core.component import Component
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class StopHandler(Component):
     CLASS_NAME = 'stop'
-    STOP_LAMBDA_NAME  = "__stop_accum" 
+    BRAKE_LAMBDA_NAME  = "__brake_accum" 
+    HALT_LAMBDA_NAME   = "__halt_accum" 
+    STOP_LAMBDA_NAME   = "__stop_accum" 
     '''
     Handles Stop group events.
 
@@ -64,65 +69,145 @@ class StopHandler(Component):
         if _event.num != self._last_event:
             if _event.num == Event.EMERGENCY_STOP.num:
                 self._emergency_stop()
+            elif _event.num == Event.BRAKE.num:
+                pass
+            elif _event.num == Event.HALT.num:
+                self.halt()
+            elif _event.num == Event.STOP.num:
+                self.stop(_event)
             else:
-                self._stop(_event)
+                raise Exception('unrecognised stop event: {}'.format(_event.name))
         self._last_event = _event.num
         # TEMP
         self._last_event = None
     
         self._log.info('post-processing message {}'.format(message.name))
 
+        # Brake: Slowly coasts all motors to a stop.
+
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _stopping_lambda(self, target_speed):
+    def brake(self, callback=None):
         '''
-        This is a lambda function that returns the target speed diminished
-        by the stopping ratio, until either it reaches near zero (and then 
-        returns zero), or at such time when there are no lambdas operating 
-        on this or any other motor, in which case it returns the name of 
-        the lambda as a signal that the robot has stopped.
+        Slowly coasts all motors to a stop.
+        Executes the callback once the robot is no longer moving.
+        '''
+        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍉 BRAKE.')
+        self._stopping_function(lambda_name=StopHandler.BRAKE_LAMBDA_NAME, lambda_function=self._braking_lambda, timeout_ms=6000, callback=callback)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def halt(self, callback=None):
+        '''
+        Quickly (but not immediately) stops all motors.
+        Executes the callback once the robot is no longer moving.
+        '''
+        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍇 HALT.')
+        self._stopping_function(lambda_name=StopHandler.HALT_LAMBDA_NAME, lambda_function=self._halting_lambda, timeout_ms=2500, callback=callback)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def stop(self, callback=None):
+        '''
+        Stops all motors very quickly.
+        Executes the callback once the robot is no longer moving.
+        '''
+        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍋 STOP.')
+        self._stopping_function(lambda_name=StopHandler.STOP_LAMBDA_NAME, lambda_function=self._stopping_lambda, timeout_ms=1000, callback=callback)
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    def _stopping_function(self, lambda_name=None, lambda_function=None, timeout_ms=5000, callback=None):
+        '''
+        Halts the robot. Executes the callback once the robot has stopped.
+        '''
+        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍐 HALT with timeout of {:d}ms.'.format(timeout_ms))
+        if self._motor_controller.is_stopped:
+            print('🍐 b. is stopped.')
+            # just in case a motor is still moving
+            for _motor in self._all_motors:
+                _motor.stop()
+            self._log.warning('already halted.')
+        elif self._motor_controller.is_stopping():
+            print('🍐 c. is stopping.')
+            self._log.warning('already halting.')
+        else:
+            print('🍐 d. else...')
+            self._log.info('halting…')
+            if self._slew_limiter_enabled:
+                self._log.info('soft halt…')
+                try:
+                    for _motor in self._all_motors:
+                        _motor.add_speed_multiplier(lambda_name, lambda_function)
+                    if callback:
+                        _count = 0
+                        _counter = itertools.count()
+                        _start_time = dt.now()
+                        _elapsed_ms = 0
+                        while not self._motor_controller.is_stopped and _elapsed_ms < timeout_ms:
+                            _count = next(_counter)
+                            _elapsed_ms = int((dt.now() - _start_time).total_seconds() * 1000)
+                            print('🍐 [{}] g. waiting til stopped: {:d}ms elapsed.'.format(_count, _elapsed_ms))
+                            time.sleep(0.1)
+                        print('🍐 h. stopped.')
+                        # TODO check if timed out and still moving? If so, emergency stop...
+                finally:
+                    print('🍐 h. removing motor lambdas…')
+                    # remove stopping lambdas from motors
+                    for _motor in self._all_motors:
+                        _motor.remove_speed_multiplier(lambda_name)
+            else:   
+                print('🍐 i.')
+                self._log.info('hard halt…')
+                for _motor in self._all_motors:
+                    _motor.stop()
+        # done .....................
+        if callback:
+            print('🍐 y. executing callback…')
+            callback()
+        print('🍐 z. halt complete.')
+
+    # lambda functions ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    '''
+    These are the lambda functions that return the target speed diminished
+    by the brake/halt/stop ratio, until either it reaches near zero (and 
+    then returns zero), or at such time when there are no lambdas operating 
+    on this or any other motor, in which case it returns the name of 
+    the lambda as a signal that the robot has halted.
+    '''
+
+    def _braking_lambda(self, target_speed):
+        '''
+        The brake lambda.
         '''
         target_speed = target_speed * self._brake_ratio
         if self._motor_controller.all_motors_are_stopped:
-            # return lambda name indicating we're done
-            return StopHandler.STOP_LAMBDA_NAME
+            return StopHandler.BRAKE_LAMBDA_NAME
         elif isclose(target_speed, 0.0, abs_tol=1e-2):
             return 0.0
         else:
             return target_speed
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def stop(self):
+    def _halting_lambda(self, target_speed):
         '''
-        Quickly stops the robot.
+        The halt lambda.
         '''
-        self._stop(Event.STOP)
+#       target_speed = target_speed * self._brake_ratio
+        target_speed = target_speed * self._halt_ratio
+        if self._motor_controller.all_motors_are_stopped:
+            return StopHandler.HALT_LAMBDA_NAME
+        elif isclose(target_speed, 0.0, abs_tol=1e-2):
+            return 0.0
+        else:
+            return target_speed
 
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _stop(self, event):
+    def _stopping_lambda(self, target_speed):
         '''
-        Slowly coasts all motors to a stop.
+        The stop lambda.
         '''
-        self._log.info(Fore.GREEN + Style.BRIGHT + "STOP event: '{}'".format(event.name))
-#       if self.is_stopped:
-#           self._log.warning('already braked.')
-#           return
-#       elif self.is_stopping():
-#           self._log.warning('already braking.')
-#           return
-#       else:
-#           self._log.info('braking…')
-        if self._slew_limiter_enabled:
-            self._log.info(Fore.YELLOW + 'stopping motors…') # stopping soft
-            for _motor in self._all_motors:
-#               self._log.info(Fore.YELLOW + 'adding stopping lambda to {} motor…'.format(_motor.orientation.name))
-                _motor.clear_speed_multipliers()
-                _motor.add_speed_multiplier(StopHandler.STOP_LAMBDA_NAME, self._stopping_lambda)
-        else:   
-            self._log.info('stopping hard…')
-            for _motor in self._all_motors:
-                _motor.target_speed = 0.0
-#       self._log.info('braking very hard…')
-#       self.emergency_stop()
+        target_speed = target_speed * self._stop_ratio
+        if self._motor_controller.all_motors_are_stopped:
+            return StopHandler.STOP_LAMBDA_NAME
+        elif isclose(target_speed, 0.0, abs_tol=1e-2):
+            return 0.0
+        else:
+            return target_speed
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _emergency_stop(self):

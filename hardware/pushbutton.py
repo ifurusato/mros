@@ -65,12 +65,12 @@ class PushButton(object):
         return self._pin
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def get(self):
+    def pushed(self):
         '''
         Returns True if the button is pushed (low).
         '''
         if self._ioe:
-            return self._ioe.input(self._pin)
+            return self._ioe.input(self._pin) == 0
         else:
             _value = not GPIO.input(self._pin)
             time.sleep(0.1)

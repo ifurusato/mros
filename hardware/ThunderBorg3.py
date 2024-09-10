@@ -1,7 +1,9 @@
 #!/usr/bin/env python3.8
 # -*- coding: utf-8 -*-
 #
-# This module is designed to communicate with the ThunderBorg
+# This module is designed to communicate with the ThunderBorg. It
+# is largely based on the original PyBorg source but has been
+# substantially modified.
 # 
 # Use by creating an instance of the class, call the Init function,
 # then command as desired, e.g.

@@ -33,6 +33,7 @@ class Orientation(Enum):
     SAFT  = ( 14, "starboard-aft", 'STBD',  "saft")
 
     MAST  = ( 15, "mast",          'NONE',  "mast")
+    CAM   = ( 16, "camera",        'NONE',  "cam")
 
     # ignore the first param since it's already set by __new__
     def __init__(self, num, name, side, label):
@@ -62,9 +63,9 @@ class Orientation(Enum):
         '''
         Return the PORT or STBD side of this orientation, NONE if it does not apply.
         '''
-        if self._side is 'PORT':
+        if self._side == 'PORT':
             return Orientation.PORT
-        if self._side is 'STBD':
+        if self._side == 'STBD':
             return Orientation.STBD
         else:
             return Orientation.NONE

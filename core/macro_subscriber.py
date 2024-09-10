@@ -56,7 +56,7 @@ class MacroSubscriber(Subscriber):
 #       # increment sent acknowledgement count
 #       self._log.info('acknowledging message {}; with payload value: {:5.2f}cm'.format(message.name, message.payload.value))
 #       message.acknowledge_sent()
-#       self._log.info('arbitrated message:    ' + Fore.WHITE + '{}'.format(message.name) 
+#       self._log.info('arbitrated message:    ' + Fore.WHITE + '{}'.format(message.name)
 #               + Fore.CYAN + ' with payload for event: {}; value: {:5.2f}cm'.format(message.payload.event.name, message.payload.value))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -71,16 +71,16 @@ class MacroSubscriber(Subscriber):
         if message.gcd:
             raise GarbageCollectedError('cannot process message: message has been garbage collected.')
         _event = message.event
-        self._log.info('🐸 pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
+        self._log.info('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         if _event == Event.MACRO:
             _name = _event.name
-            self._log.info('🐱 processing MACRO message {} with name: '.format(message.name) + Fore.YELLOW + '{}'.format(_name))
+            self._log.info('processing MACRO message {} with name: '.format(message.name) + Fore.YELLOW + '{}'.format(_name))
             self._macro_publisher.queue_by_name(message.payload)
         elif self.acceptable(message):
             _name = _event.name
-            self._log.info('🐹 processing acceptable message {} with macro name: '.format(message.name) + Fore.YELLOW + '{}'.format(_name))
+            self._log.info('processing acceptable message {} with macro name: '.format(message.name) + Fore.YELLOW + '{}'.format(_name))
             _value = message.payload.value
-            self._log.info('🎃 type: {}; name {}; '.format(type(_value), _value)) # TODO react differently depending on which bumper
+            self._log.info('type: {}; name {}; '.format(type(_value), _value)) # TODO react differently depending on which bumper
             # TODO permit passing a Message as a value so we don't need to create one here...
             # add a VELOCITY completion message as a payload
             _message = self._message_factory.create_message(Event.VELOCITY, _value)

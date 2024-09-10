@@ -72,8 +72,12 @@ class Event(Enum):
     # system events ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     SHUTDOWN               = ( 10, "shutdown",                  1,   Group.SYSTEM )
     BATTERY_LOW            = ( 11, "battery low",               1,   Group.SYSTEM )
-    HIGH_TEMPERATURE       = ( 12, "high temperature",          1,   Group.SYSTEM )
-    OVER_CURRENT           = ( 13, "over current",              1,   Group.SYSTEM )
+    REGULATOR_5V_LOW       = ( 12, "regulator 5v low",          1,   Group.SYSTEM )
+    REGULATOR_3V3_LOW      = ( 13, "regulator 3.3v low",        1,   Group.SYSTEM )
+    HIGH_TEMPERATURE       = ( 14, "high temperature",          1,   Group.SYSTEM )
+    OVER_CURRENT           = ( 15, "over current",              1,   Group.SYSTEM )
+    NO_CONNECTION          = ( 16, "no gamepad connection",     1,   Group.SYSTEM )
+    DISCONNECTED           = ( 17, "gamepad disconnected",      1,   Group.SYSTEM )
 
     # lambda events ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     MACRO                  = ( 20, "macro script",              5,   Group.MACRO ) # with script ID as value

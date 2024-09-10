@@ -7,7 +7,7 @@
 #
 # author:   Murray Altheim
 # created:  2024-05-20
-# modified: 2024-08-04
+# modified: 2024-08-22
 #
 # DO NOT EDIT: This is an auto-generated file.
 #
@@ -28,7 +28,7 @@ JSONEncoder.default = _default
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Sound(Enum):
-    __order__ = " SILENCE CHATTER_1 CHATTER_2 CHATTER_3 CHATTER_4 CHATTER_5 CHIRP_1 CHIRP_2 TELEMETRY KLAXON BIPPIT BUZZ BZAT DWERP EARPIT EEPIT_AR_WOT HZAH ITIZ IZIT PEW_PEW_PEW PING PIZZLE POKE SONIC_BAT SPIN_DOWN TWEAK VIBRATE TWIDDLE_POP CHATTER TINY_GLITCH SKID_FZZT ZZT "
+    __order__ = " SILENCE CHATTER_1 CHATTER_2 CHATTER_3 CHATTER_4 CHATTER_5 CHIRP_1 CHIRP_2 TELEMETRY KLAXON BIPPIT BUZZ BZAT DWERP EARPIT EEPIT_AR_WOT HZAH ITIZ IZIT PEW_PEW_PEW PING PIZZLE POKE SONIC_BAT SPIN_DOWN TWEAK VIBRATE TWIDDLE_POP CHATTER TINY_GLITCH SKID_FZZT WASSUP FLUTTER AUTOSCAN SLIP_SLIDE SCISSORS ARTICULATION BLIP ZZT CHANGE_CHANNELS CHK_REEEL DROPLET GULP IPPURT LOCK_N_LOAD MARTINI PINBALL RATATATAT ROLLUP SIZZLE SWEEP TELETYPE TSK_TSK_TSK SMALL_TICK TICK_TOCK "
 
     #                idx   name            mnemonic     dur(s)  filename                description
     SILENCE       = (  1, 'silence',      'SILENCE',      0.0, 'silence.wav',      'silence')
@@ -62,7 +62,30 @@ class Sound(Enum):
     CHATTER       = ( 29, 'chatter',      'CHATTER',      1.0, 'chatter.wav',      'chatter 29')
     TINY_GLITCH   = ( 30, 'tiny-glitch',  'TINY_GLITCH',  1.0, 'tiny-glitch.wav',  'tiny glitch 30')
     SKID_FZZT     = ( 31, 'skid-fzzt',    'SKID_FZZT',    1.0, 'skid-fzzt.wav',    'skid fzzt 31')
-    ZZT           = ( 32, 'zzt',          'ZZT',          1.0, 'zzt.wav',          'zzt 32')
+    WASSUP        = ( 32, 'wassup',       'WASSUP',       1.0, 'wassup.wav',       'wassup 32n')
+    FLUTTER       = ( 33, 'flutter',      'FLUTTER',      1.0, 'flutter.wav',      'flutter 33')
+    AUTOSCAN      = ( 34, 'autoscan',     'AUTOSCAN',     1.0, 'autoscan.wav',     'autoscan 34')
+    SLIP_SLIDE    = ( 35, 'slip-slide',   'SLIP_SLIDE',   1.0, 'slip-slide.wav',   'slip-slide 35')
+    SCISSORS      = ( 36, 'scissors',     'SCISSORS',     1.0, 'scissors.wav',     'scissors 36')
+    ARTICULATION  = ( 37, 'articulation', 'ARTICULATION', 1.0, 'articulation.wav', 'articulation 37')
+    BLIP          = ( 38, 'blip',         'BLIP',         1.0, 'blip.wav',         'blip 38')
+    ZZT           = ( 39, 'zzt',          'ZZT',          1.0, 'zzt.wav',          'zzt 39')
+    CHANGE_CHANNELS  = ( 40, 'change-channels', 'CHANGE_CHANNELS', 1.0, 'change-channels.wav', 'change-channels 40')
+    CHK_REEEL     = ( 41, 'chk-reeel',    'CHK_REEEL',    1.0, 'chk-reeel.wav',    'chk-reeel 41')
+    DROPLET       = ( 42, 'droplet',      'DROPLET',      1.0, 'droplet.wav',      'droplet 42')
+    GULP          = ( 43, 'gulp',         'GULP',         1.0, 'gulp.wav',         'gulp 43')
+    IPPURT        = ( 44, 'ippurt',       'IPPURT',       1.0, 'ippurt.wav',       'ippurt 44')
+    LOCK_N_LOAD   = ( 45, 'lock-n-load',  'LOCK_N_LOAD',  1.0, 'lock-n-load.wav',  'lock-n-load 45')
+    MARTINI       = ( 46, 'martini',      'MARTINI',      1.0, 'martini.wav',      'martini 46')
+    PINBALL       = ( 47, 'pinball',      'PINBALL',      1.0, 'pinball.wav',      'pinball 47')
+    RATATATAT     = ( 48, 'ratatatat',    'RATATATAT',    2.0, 'ratatatat.wav',    'ratatatat 48')
+    ROLLUP        = ( 49, 'rollup',       'ROLLUP',       1.0, 'rollup.wav',       'rollup 49')
+    SIZZLE        = ( 50, 'sizzle',       'SIZZLE',       1.0, 'sizzle.wav',       'sizzle 50')
+    SWEEP         = ( 51, 'sweep',        'SWEEP',        1.0, 'sweep.wav',        'sweep 51')
+    TELETYPE      = ( 52, 'teletype',     'TELETYPE',     1.0, 'teletype.wav',     'teletype 52')
+    TSK_TSK_TSK   = ( 53, 'tsk-tsk-tsk',  'TSK_TSK_TSK',  1.0, 'tsk-tsk-tsk.wav',  'tsk-tsk-tsk 53')
+    SMALL_TICK    = ( 54, 'small-tick',   'SMALL_TICK',   1.0, 'small-tick.wav',   'small-tick 54')
+    TICK_TOCK     = ( 55, 'tick-tock',    'TICK_TOCK',    1.0, 'tick-tock.wav',    'tick-tock 55')
 
     # ignore the first param since it's already set by __new__
     def __init__(self, num, name, mnemonic, duration, filename, description):

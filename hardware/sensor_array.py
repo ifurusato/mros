@@ -32,6 +32,7 @@ import ioexpander as io
 from core.logger import Logger, Level
 from core.event import Event, Group
 from core.stringbuilder import StringBuilder
+from core.convert import Convert
 from core.util import Util
 from core.publisher import Publisher
 from hardware.i2c_scanner import I2CScanner
@@ -430,10 +431,10 @@ class SensorArray(Publisher):
                         _mast_msg, _bp_msg, _bs_msg, _wsa_msg, _wsf_msg, _wpa_msg, _wpf_msg))
     
             # analog pins ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-            self._fop_cm = int(Util.convert_to_distance(self.get_fop_value())) # oblique fore port IR distance
+            self._fop_cm = int(Convert.convert_to_distance(self.get_fop_value())) # oblique fore port IR distance
             if Event.BUMPER_FOBP not in self._suppressed and self._fop_cm < self._oblique_trigger_cm: # 20cm
                 self._fobp_triggered = _now_ts
-            self._fos_cm = int(Util.convert_to_distance(self.get_fos_value())) # oblique fore starboard IR distance
+            self._fos_cm = int(Convert.convert_to_distance(self.get_fos_value())) # oblique fore starboard IR distance
             if Event.BUMPER_FOBS not in self._suppressed and self._fos_cm < self._oblique_trigger_cm: # 20cm
                 self._fobs_triggered = _now_ts
     
@@ -535,10 +536,10 @@ class SensorArray(Publisher):
                     _bp_msg, _bs_msg, _wsa_msg, _wsf_msg, _wpa_msg, _wpf_msg))
 
         # analog pins ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        self._fop_cm = int(Util.convert_to_distance(self.get_fop_value())) # oblique fore port IR distance
+        self._fop_cm = int(Convert.convert_to_distance(self.get_fop_value())) # oblique fore port IR distance
         if self._fop_cm < self._oblique_trigger_cm: # 20cm
             self._fobp_triggered = _now_ts
-        self._fos_cm = int(Util.convert_to_distance(self.get_fos_value())) # oblique fore starboard IR distance
+        self._fos_cm = int(Convert.convert_to_distance(self.get_fos_value())) # oblique fore starboard IR distance
         if self._fos_cm < self._oblique_trigger_cm: # 20cm
             self._fobs_triggered = _now_ts
 

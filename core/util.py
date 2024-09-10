@@ -7,10 +7,12 @@
 #
 # author:   Murray Altheim
 # created:  2021-07-07
-# modified: 2021-07-07
+# modified: 2024-08-27
 #
 
+import sys
 import time
+import os, subprocess
 from pathlib import Path
 from datetime import datetime as dt
 import json
@@ -130,6 +132,11 @@ class Util(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
+    def get_class_name_of_method(method):
+        return vars(sys.modules[method.__module__])[method.__qualname__.split('.')[0]].__name__
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
     def list_methods(cls):
         '''
         Print the methods of the provided class.
@@ -173,57 +180,6 @@ class Util(object):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @staticmethod
-    def convert_to_distance(value):
-        '''
-        Converts the value returned by the IR sensor to a distance in centimeters.
-
-        Distance Calculation ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-
-        This is reading the distance from a 3 volt Sharp GP2Y0A60SZLF infrared
-        sensor to a piece of white A4 printer paper in a low ambient light room.
-        The sensor output is not linear, but its accuracy is not critical. If
-        the target is too close to the sensor the values are not valid. According
-        to spec 10cm is the minimum distance, but we get relative variability up
-        until about 5cm. Values over 150 clearly indicate the robot is less than
-        10cm from the target. Here's a sampled output:
-
-            0cm = unreliable
-            5cm = 226.5
-          7.5cm = 197.0
-           10cm = 151.0
-           20cm =  92.0
-           30cm =  69.9
-           40cm =  59.2
-           50cm =  52.0
-           60cm =  46.0
-           70cm =  41.8
-           80cm =  38.2
-           90cm =  35.8
-          100cm =  34.0
-          110cm =  32.9
-          120cm =  31.7
-          130cm =  30.7 *
-          140cm =  30.7 *
-          150cm =  29.4 *
-
-        * Maximum range on IR is about 130cm, after which there is diminishing
-          stability/variability, i.e., it's hard to determine if we're dealing
-          with a level of system noise rather than data. Different runs produce
-          different results, with values between 28 - 31 on a range of any more
-          than 130cm.
-
-        See: http://ediy.com.my/blog/item/92-sharp-gp2y0a21-ir-distance-sensors
-        '''
-        if value == None or value == 0:
-            return None
-        _FUDGE_FACTOR = -2.00
-        _EXPONENT = 1.34
-        _NUMERATOR = 1000.0
-        _distance = pow( _NUMERATOR / value, _EXPONENT ) + _FUDGE_FACTOR
-        return _distance
-
-    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    @staticmethod
     def clip(value, min_value, max_value):
         '''
         A replacement for numpy's clip():
@@ -252,6 +208,38 @@ class Util(object):
             binary_len = binary_len - 1
             decimal += pow(2,binary_len) * int(x)
         return decimal
+
+    # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+    @staticmethod
+    def already_running(process_name):
+        '''
+        Returns true if there is already an instance of a process running.
+
+        This is a static method so other processes can check prior to
+        starting a process rather than dealing with the RuntimeException
+        thrown.
+
+        This parses the output of 'ps --no-headers -f -C python3' to see
+        if a different instance of this script is already running:
+
+            UID          PID    PPID  C STIME TTY          TIME CMD
+            pi          4186    1058  3 13:04 pts/0    00:00:31 python3 monitor_test.py
+            pi          5985    1058 95 13:18 pts/0    00:00:00 python3 monitor_exec.py
+        '''
+        try:
+            _pid = os.getpid()
+            _result = subprocess.check_output(['ps', '--no-headers', '-f', '-C', 'python3'])
+            _lines = _result.splitlines()
+            for _bytes in _lines:
+                _parts = _bytes.decode('utf-8').split() # convert byte array to string and split
+                if int(_parts[1]) != _pid and _parts[7] == 'python3' and process_name in _parts[8]: 
+                    return True
+        except subprocess.CalledProcessError as e:
+            # called if grep returns nothing
+            return False
+        except Exception as e:
+            print('exception: {}'.format(e))
+        return False
 
 #   @staticmethod
 #   def clip_alt(n, minimum, maximum):

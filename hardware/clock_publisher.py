@@ -61,7 +61,7 @@ class ClockPublisher(Publisher):
         self._divider      = _cfg.get('divider')
         self._log.info('clock divider:\t{:d}'.format(self._divider))
         self._counter      = itertools.count()
-        self._millis       = lambda: int(round(time.time() * 1000))
+        self._millis       = lambda: int(round(time.perf_counter() * 1000))
         self._timestamp = dt.now()
         self._log.info('ready.')
 

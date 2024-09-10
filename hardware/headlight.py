@@ -14,6 +14,7 @@ from core.logger import Logger, Level
 from core.orientation import Orientation
 
 from hardware.matrix import Matrix
+from hardware.switch import Switch
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class Headlight(object):
@@ -24,6 +25,7 @@ class Headlight(object):
     def __init__(self, orientation, level=Level.DEBUG):
         self._log = Logger('headlight', level)
         self._matrix = Matrix(orientation)
+        self._switch = Switch(level=Level.WARN)
         self._on = False
         self._log.info('ready.')
 
@@ -39,6 +41,8 @@ class Headlight(object):
         '''
         Turn on the headlight.
         '''
+        self._switch.led_on()
+        self._switch.on()
         self._matrix.on()
         self._on = True
 
@@ -47,6 +51,8 @@ class Headlight(object):
         '''
         Turn off the headlight.
         '''
+        self._switch.off()
+        self._switch.led_off()
         self._matrix.off()
         self._on = False
 
