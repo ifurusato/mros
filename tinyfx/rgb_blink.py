@@ -12,7 +12,7 @@
 from picofx import Cycling
 
 import itertools
-from color import Color
+from colors import*
 
 class RgbBlinkFX(Cycling):
     '''
@@ -24,7 +24,7 @@ class RgbBlinkFX(Cycling):
     :param:   speed   the speed of the blink, where 1.0 is 1 second, 0.5 is 2 seconds, etc.
     :param:   phase   the phase of the blink
     :param:   duty    the duty cycle of the blink
-    :param:   color   an RGB tuple as the color or colors of the blink
+    :param:   color   the color or colors of the blink
     '''
     def __init__(self, speed=1, phase=0.0, duty=0.5, color=None):
         super().__init__(speed)
@@ -33,8 +33,7 @@ class RgbBlinkFX(Cycling):
         self._colors = []
         self._counter = itertools.count()
         if color is None:
-#           self._colors.append(Color.RED)
-            self._colors.append((0, 255, 0, 0))
+            self._colors.append(COLOR['RED'])
         elif isinstance(color, tuple):
             self._colors.append(color)
         elif type(color) is list:
@@ -51,9 +50,9 @@ class RgbBlinkFX(Cycling):
                 self._color = self._colors[0]
             elif next(self._counter) % 5 == 0:
                 self._color = next(self._cycle)
-            _red   = self._color[1]
-            _green = self._color[2]
-            _blue  = self._color[3]
+            _red   = self._color[0]
+            _green = self._color[1]
+            _blue  = self._color[2]
             return _red, _green, _blue
         else:
             return 0, 0, 0

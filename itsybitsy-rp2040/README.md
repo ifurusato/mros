@@ -22,6 +22,7 @@ The specific files used include:
 * RP2040_Slave.py : the actual I2C implementation
 * RP2040_I2C_Registers.py : used by RP2040_Slave
 * send.py : a demo I2C Master, used to send messages
+* response.py : the transaction response codes
 
 * i2c_slave_test.py : tests just the I2CSlave class
 * i2c_driver_test.py : tests the I2CDriver class (copied as main.py)

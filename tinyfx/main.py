@@ -9,19 +9,20 @@
 # created:  2024-09-08
 # modified: 2024-09-08
 #
+# Tiny FX main
 
 import utime
-from machine import Pin
 from tiny_fx import TinyFX
 from picofx import MonoPlayer, ColourPlayer
 #from picofx.colour import RainbowFX
 
+from picofx.mono import RandomFX, StaticFX, BlinkFX
+
+from colors import*
 from pin_set import PinSetFX
 from triofx import TrioFX
 from rgb_blink import RgbBlinkFX
-from picofx.mono import RandomFX, StaticFX, BlinkFX
-
-from color import Color
+from i2c_settable_blink import I2CSettableBlinkFX
 
 # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 
@@ -31,21 +32,23 @@ rgb_player = ColourPlayer(tiny.rgb)     # create a new effect player to control 
 
 # set up the effects to play
 player.effects = [
-#   BlinkFX(speed=0.5, phase=0.0, duty=0.02),
-    TrioFX(1, brightness=0.3),
-    TrioFX(2, brightness=1.0),
-    TrioFX(3, brightness=1.0),
+    I2CSettableBlinkFX(1, speed=0.5, phase=0.0, duty=0.015),
+    BlinkFX(speed=0.5, phase=0.0, duty=0.02),
+    BlinkFX(speed=0.5, phase=0.0, duty=0.02),
     None,
     None,
     None
 ]
 
+#   TrioFX(1, brightness=0.3),
+#   TrioFX(2, brightness=0.25), # downlight
+#   TrioFX(3, brightness=1.0), # headlight
 #   BlinkFX(speed=0.5, phase=0.0, duty=0.02),
 #   StaticFX(brightness=1.0),
 #   RandomFX(interval=0.01, brightness_min=0.5, brightness_max=1.0),
 
 # create and set up a rainbow effect to play
-_colors = [ Color.VERY_DARK_CYAN, Color.VERY_DARK_CYAN, Color.VERY_DARK_CYAN, Color.VERY_DARK_CYAN, Color.RED ]
+_colors = [ COLOR['VERY_DARK_CYAN'], COLOR['VERY_DARK_CYAN'], COLOR['VERY_DARK_CYAN'], COLOR['VERY_DARK_CYAN'], COLOR['RED'] ]
 rgb_player.effects = RgbBlinkFX(speed=1.0, phase=0.0, duty=0.05, color=_colors)
 
 # pair the RGB player with the Mono player so they run in sync
