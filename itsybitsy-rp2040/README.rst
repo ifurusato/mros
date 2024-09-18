@@ -11,9 +11,9 @@ single byte as a return code.
 
 The send.py file is a demo I2C master for the I2CDriver, e.g.:
 
-```
-% send.py "set dark_orange"
-```
+  ```
+  % send.py "set dark_orange"
+  ```
 
 This sets the RGB LED on the Itsy Bitsy RP2040 to dark orange.
 
