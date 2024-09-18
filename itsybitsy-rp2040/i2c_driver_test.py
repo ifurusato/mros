@@ -13,9 +13,6 @@
 # message and set the NeoPixel color.
 #
 
-from machine import Pin
-from neopixel import Neopixel
-
 from i2c_driver import I2CDriver
 
 _driver = I2CDriver()
