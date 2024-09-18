@@ -6,8 +6,8 @@ This provides some very basic I2C slave support on the RP2040, and specific
 additional support for setting the color of the NeoPixel on the Adafruit
 Itsy Bitsy RP2040.
 
-The messages received may be up to 32 ASCII characters in length, with a
-single byte as a return code.
+Messages may be up to 32 ASCII characters in length, with a single byte as
+a return code.
 
 The send.py file is a demo I2C master for the I2CDriver, e.g.:
 
@@ -40,7 +40,7 @@ Untested, work-in-progress files:
 * sensor.py
 * sensor_test.py
 
-The I2CDriver class demonstrates how to extend the I2CSlave class to perform
+The `I2CDriver` class demonstrates how to extend the `I2CSlave` class to perform
 some kind of additional processing on the incoming payload, by overriding the
-process_payload() method.
+`process_payload()` method.
 
