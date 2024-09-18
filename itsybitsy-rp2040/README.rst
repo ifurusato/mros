@@ -9,6 +9,12 @@ Itsy Bitsy RP2040.
 The messages received may be up to 32 ASCII characters in length, with a
 single byte as a return code.
 
+send.py is a demo I2C master for the I2CDriver, e.g.:
+```
+   % send.py "set dark_orange"
+```
+This sets the RGB LED on the Itsy Bitsy RP2040 to dark orange.
+
 The specific files used include:
 
 * i2c_slave.py  : the core I2CSlave class
