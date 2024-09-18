@@ -1,6 +1,4 @@
-****************************
-I2C Slave support for RP2040
-****************************
+# I2C Slave support for RP2040
 
 This provides some very basic I2C slave support on the RP2040, and specific
 additional support for setting the color of the NeoPixel on the Adafruit
@@ -45,15 +43,13 @@ some kind of additional processing on the incoming payload, by overriding the
 `process_payload()` method.
 
 
-Requirements
-************
+## Requirements
 
 This was programmed using MicroPython v1.23.0 but will probably work in older
 versions as it doesn't use any of the newer language features.
 
 
-Installation
-************
+## Installation
 
 If you're installing the I2CSlave on a generic RP2040 and don't require the
 additional I2CDriver class, the only required files are:
@@ -71,15 +67,13 @@ status() method) could be commented out or removed as they are not necessary
 for basic functionality.
 
 
-Support & Liability
-*******************
+## Support & Liability
 
 This project comes with no promise of support or acceptance of liability. Use at
 your own risk.
 
 
-Copyright & License
-*******************
+## Copyright & License
 
 All contents (including software, documentation and images) Copyright 2020-2024
 by Murray Altheim. All rights reserved.
