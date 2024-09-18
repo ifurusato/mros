@@ -27,6 +27,8 @@ from core.message_bus import MessageBus
 from core.publisher import Publisher
 from hardware.gamepad import Gamepad
 from hardware.gamepad_monitor import GamepadMonitor
+from hardware.player import Player
+from hardware.sound import Sound
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class GamepadPublisher(Publisher):
@@ -37,6 +39,7 @@ class GamepadPublisher(Publisher):
     def __init__(self, config, message_bus, message_factory, exit_on_complete=True, level=Level.INFO):
         Publisher.__init__(self, 'gamepad', config, message_bus, message_factory, suppressed=False, level=level)
         self._level             = level
+        self._play_sound        = self._config['mros'].get('play_sound')
         _cfg = self._config['mros'].get('publisher').get('gamepad')
         self._publish_delay_sec = _cfg.get('publish_delay_sec')
         self._gamepad           = None
@@ -50,7 +53,7 @@ class GamepadPublisher(Publisher):
             return
         if self._gamepad is None:
             try:
-                self._log.info('🌺 connecting to gamepad…')
+                self._log.info('connecting to gamepad…')
                 self._gamepad = Gamepad(self._config, self._message_bus, self._message_factory, level=self._level)
             except ConnectionError as e:
                 self._log.error('unable to connect to gamepad: {}'.format(e))
@@ -77,6 +80,8 @@ class GamepadPublisher(Publisher):
                     self._gamepad.connect()
                     time.sleep(0.5)
                     if self._gamepad.has_connection() or _count > 5:
+                        if self._play_sound:
+                            Player.instance().play(Sound.MARTINI)
                         break
             except ConnectionError as e:
                 self._log.warning('unable to connect to gamepad: {}'.format(e))
@@ -86,14 +91,10 @@ class GamepadPublisher(Publisher):
                 self._gamepad = None
         else:
             self._log.info('no gamepad available.')
-        print('🦊 a.')
         self._monitor = GamepadMonitor(self._gamepad, self._disappearance_callback, self._level)
-        print('🦊 b.')
         if self._gamepad is None:
-            print('🦊 c.')
             self._monitor.no_connection()
         else:
-            print('🦊 d. finish connection…')
             if self._gamepad.has_connection():
                 # now set up task loop
                 if self._gamepad:
@@ -108,10 +109,7 @@ class GamepadPublisher(Publisher):
                 else:
                     Publisher.disable(self)
                     self._log.info('disabled: no gamepad.')
-                print('🦊 e.')
                 self._monitor.enable()
-            else:
-                print('🦊 f.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _disappearance_callback(self):
@@ -141,7 +139,7 @@ class GamepadPublisher(Publisher):
             if self._message_bus.get_task_by_name(GamepadPublisher._PUBLISH_LOOP_NAME):
                 self._log.warning('already enabled.')
                 return
-            self._log.warning('👚 waiting to connect to gamepad…')
+            self._log.info('waiting to connect to gamepad…')
             _connect_delay_sec = 1.0
             _timer = Timer(_connect_delay_sec, self._connect_gamepad)
             _timer.start()

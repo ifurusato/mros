@@ -141,8 +141,8 @@ class Event(Enum):
     BUMPER_PAFT            = ( 116, "port aft bumper",          4,   Group.BUMPER )
     BUMPER_SFWD            = ( 117, "starboard fwd bumper",     4,   Group.BUMPER )
     BUMPER_SAFT            = ( 118, "starboard aft bumper",     4,   Group.BUMPER )
-    BUMPER_FOBP            = ( 119, "fwd oblique port",         4,   Group.BUMPER )
-    BUMPER_FOBS            = ( 120, "fwd oblique starboard",    4,   Group.BUMPER )
+    BUMPER_FOBP            = ( 119, "fwd oblique port",        10,   Group.BUMPER )
+    BUMPER_FOBS            = ( 120, "fwd oblique starboard",   10,   Group.BUMPER )
 
     # infrared ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     INFRARED_PORT          = ( 130, "infrared port",           51,   Group.INFRARED )

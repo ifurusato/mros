@@ -66,6 +66,7 @@ class PIDController(Component):
         # used for hysteresis, if queue too small will zero-out motor power too quickly
         _queue_len = _cfg.get('hyst_queue_len')
         self._deque = Deque([], maxlen=_queue_len)
+        self._target_speed = 0.0
         self._power        = 0.0
         self._last_power   = 0.0
         self._last_time = dt.now() # for calculating elapsed time
@@ -131,46 +132,57 @@ class PIDController(Component):
     @property
     def stats(self):
         '''
-         Returns statistics a tuple for this PID contrroller:
+         Returns statistics a tuple for this PID controller:
             [kp, ki, kd, cp, ci, cd, last_power, current_motor_power, power, _speed, setpoint, steps]
         '''
         kp, ki, kd = self._pid.constants
         cp, ci, cd = self._pid.components
-        return kp, ki, kd, cp, ci, cd, self._last_power, self._motor.current_power_level, self._power, self._motor.target_speed, self._pid.setpoint, self._motor.steps
+        return kp, ki, kd, cp, ci, cd, self._last_power, self._motor.get_current_power(), self._power, self._motor.target_speed, self._pid.setpoint, self._motor.steps
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def set_speed(self, target_speed):
+        _changed = target_speed != self._target_speed
+        if _changed:
+            self._target_speed = target_speed 
         if self.enabled:
+            _elapsed_ms = round(( dt.now() - self._last_time ).total_seconds() * 1000.0)
+            _count = next(self._counter)
             if isclose(target_speed, 0.0, abs_tol=1e-2):
                 self._pid.setpoint = 0.0
-                self._power = 0.0
+                self._pid.target   = 0.0
+                self._power        = 0.0
                 self._motor.set_motor_power(0.0)
-#               self._log.info(Fore.WHITE + Style.DIM + 'target speed: {:5.2f} sets power motor: 0.0'.format(target_speed))
+                if self._verbose:
+                    if _count % 20 == 0:
+                        self._log.info(Fore.WHITE + Style.DIM + 'target speed: {:5.2f}; stopped; power: {:4.2f};\tvelocity: {:4.2f}'.format(target_speed, self._power, self._motor.velocity))
             else:
                 self._pid.setpoint = target_speed
                 # converts speed to power...
                 self._pid.target = self._motor.velocity
                 _pid_output = self._pid()
 #               _pid_output = self._pid(self._motor.velocity)
+#               if _changed:
                 self._power += _pid_output
+                self._log.info(Fore.YELLOW + '_pid_output: {:4.2f};\t_power: {:4.2f};\tvelocity: {:4.2f}'.format(_pid_output, self._power, self._motor.velocity))
                 _motor_power = self._power
-                self._last_power = self._power
-#               _mean_setpoint = self._get_mean_setpoint(self._pid.setpoint)
-#               if _mean_setpoint == 0.0:
-#                   self._log.info(Fore.WHITE + Style.BRIGHT + 'set power for {} motor: {:<5.2f} to 0.0 (pid output: {:5.2f})'.format(self._orientation.label, _motor_power, _pid_output))
-#                   self._motor.set_motor_power(0.0)
+                self._motor.set_motor_power(_motor_power)
 
+#           _mean_setpoint = self._get_mean_setpoint(self._pid.setpoint)
+#           if _mean_setpoint == 0.0:
+#               self._log.info(Fore.WHITE + Style.BRIGHT + 'set power for {} motor: {:<5.2f} to 0.0 (pid output: {:5.2f})'.format(self._orientation.label, _motor_power, _pid_output))
+#               self._motor.set_motor_power(0.0)
                 if self._verbose:
-                    _elapsed_ms = round(( dt.now() - self._last_time ).total_seconds() * 1000.0)
-                    _count = next(self._counter)
                     if _count % 20 == 0:
                         self._log.info(Fore.YELLOW + 'target speed: {:5.2f}; current speed: {:5.2f};'.format(target_speed, self._motor.target_speed)
                                 + Fore.GREEN + Style.NORMAL + ' pid.setpoint: {:5.2f}; pid output: {:5.2f};'.format(self._pid.setpoint, _pid_output)
 #                               + Fore.MAGENTA + ' kp: {:7.4f}; ki: {:7.4f}; kd: {:7.4f})'.format(self._pid.kp, self._pid.ki, self._pid.kd)
                                 + Fore.WHITE + ' motor power: {:<5.2f};'.format(_motor_power)
                                 + Fore.CYAN + Style.NORMAL + ' elapsed: {:d}ms'.format(_elapsed_ms))
-                self._motor.set_motor_power(_motor_power)
-        self._last_time = dt.now()
+
+            self._last_power = self._power
+            self._last_time = dt.now()
+        else:
+            self._log.info(Fore.RED + 'pid controller disabled.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _get_mean_setpoint(self, value):

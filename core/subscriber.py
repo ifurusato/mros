@@ -12,6 +12,7 @@
 
 import asyncio
 import random
+import traceback
 from asyncio import CancelledError
 #from typing import final
 from datetime import datetime as dt
@@ -182,75 +183,80 @@ class Subscriber(Component, FiniteStateMachine):
         This method is not meant to be overridden, except by the garbage
         collector. The process_message() method can be overridden.
         '''
-#       self._log.debug('consume() called on {}.'.format(self.name))
-        _peeked_message = await self._message_bus.peek_message()
-        if not _peeked_message:
-            raise QueueEmptyOnPeekError('peek returned none.')
-        elif _peeked_message.gcd:
-            raise GarbageCollectedError('{} cannot consume: message has been garbage collected. [1]'.format(self.name))
+        try:
 
-#       self._log.debug('consume() continuing for {}...'.format(self.name))
-        _ackd = _peeked_message.acknowledged_by(self)
-        if not _ackd and self.acceptable(_peeked_message):
-            _event = asyncio.Event()
-            self._log.debug(Fore.RED + 'begin event tracking for message:' + Fore.WHITE
-                    + ' {}; event: {}'.format(_peeked_message.name, _peeked_message.event.name))
+#           self._log.debug('consume() called on {}.'.format(self.name))
+            _peeked_message = await self._message_bus.peek_message()
+            if not _peeked_message:
+                raise QueueEmptyOnPeekError('peek returned none.')
+            elif _peeked_message.gcd:
+                raise GarbageCollectedError('{} cannot consume: message has been garbage collected. [1]'.format(self.name))
+    
+#           self._log.debug('consume() continuing for {}...'.format(self.name))
+            _ackd = _peeked_message.acknowledged_by(self)
+            if not _ackd and self.acceptable(_peeked_message):
+                _event = asyncio.Event()
+                self._log.debug(Fore.RED + 'begin event tracking for message:' + Fore.WHITE
+                        + ' {}; event: {}'.format(_peeked_message.name, _peeked_message.event.name))
+    
+                # acknowledge we've seen the message
+                _peeked_message.acknowledge(self)
+    
+                # this subscriber accepts this message and hasn't seen it before so consume and handle the message
+#               self._log.debug('waiting to consume acceptable message:'
+#                       + Fore.WHITE + ' {}; event: {}'.format(_peeked_message.name, _peeked_message.event.name))
+    
+                _message = await self._message_bus.consume_message()
+                self._message_bus.consumed()
+#               if self._message_bus.verbose:
+#                   self._log.debug('consumed acceptable message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
+    
+                # handle acceptable message
+                if self._message_bus.verbose:
+                    _elapsed_ms = (dt.now() - _message.timestamp).total_seconds() * 1000.0
+                    self._print_message_info('process message:', _message, _elapsed_ms)
+#               self._log.debug('creating task for processing message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
+                # create message processing task
+                asyncio.create_task(self.process_message(_message), name='{}:process-message-{}'.format(self.name, _message.name))
+    
+                # create message cleanup task
+                _cleanup_task = asyncio.create_task(self._cleanup_message(_message), name='{}:cleanup-message-{}'.format(self.name, _message.name))
+                _cleanup_task.add_done_callback(self._done_callback)
+    
+#               breakpoint()
+    
+#               self._log.debug('end event tracking for message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
+                _event.set()
+    
+                # we've handled message so pass along to arbitrator
+                if _message.sent == 0:
+#                   self._log.debug('sending message: {}; event: {} to arbitrator...'.format(_message.name, _message.event.name))
+                    await self._arbitrate_message(_message)
+#                   self._log.debug('sent message:' + Fore.WHITE + ' {}; event: {} to arbitrator.'.format(_message.name, _message.event.name))
+                elif _message.sent == -1:
+                    # don't arbitrate, just keep republishing this message
+                    pass
+                elif not self._permit_resend:
+                    self._log.warning('message: {} already sent; event: {}'.format(_message.name, _message.event.name))
+    
+#               # keep track of timestamp of last message
+#               self._log.debug('last message timestamp: {}'.format(_message.timestamp))
+#               self._message_bus.last_message_timestamp = _message.timestamp
+                # republish the message
+#               self._log.debug('awaiting republication of message:' \
+#                   + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
+                await self._message_bus.republish_message(_message)
+#               self._log.debug('message:' + Fore.WHITE + ' {} with event: {}'.format(_message.name, _message.event.name) + ' has been republished.')
+    
+            elif not _ackd:
+                # if not already ack'd, acknowledge we've seen the message
+#               self._log.debug('acknowledging unacceptable message:' + Fore.WHITE + ' {}; event: {} (queue: {:d} elements)'.format(
+#                       _peeked_message.name, _peeked_message.event.name, self._message_bus.queue_size))
+                _peeked_message.acknowledge(self)
+#           self._log.debug('consume() complete on {}.'.format(self.name))
 
-            # acknowledge we've seen the message
-            _peeked_message.acknowledge(self)
-
-            # this subscriber accepts this message and hasn't seen it before so consume and handle the message
-#           self._log.debug('waiting to consume acceptable message:'
-#                   + Fore.WHITE + ' {}; event: {}'.format(_peeked_message.name, _peeked_message.event.name))
-
-            _message = await self._message_bus.consume_message()
-            self._message_bus.consumed()
-#           if self._message_bus.verbose:
-#               self._log.debug('consumed acceptable message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
-
-            # handle acceptable message
-            if self._message_bus.verbose:
-                _elapsed_ms = (dt.now() - _message.timestamp).total_seconds() * 1000.0
-                self._print_message_info('process message:', _message, _elapsed_ms)
-#           self._log.debug('creating task for processing message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
-            # create message processing task
-            asyncio.create_task(self.process_message(_message), name='{}:process-message-{}'.format(self.name, _message.name))
-
-            # create message cleanup task
-            _cleanup_task = asyncio.create_task(self._cleanup_message(_message), name='{}:cleanup-message-{}'.format(self.name, _message.name))
-            _cleanup_task.add_done_callback(self._done_callback)
-
-#           breakpoint()
-
-#           self._log.debug('end event tracking for message:' + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
-            _event.set()
-
-            # we've handled message so pass along to arbitrator
-            if _message.sent == 0:
-#               self._log.debug('sending message: {}; event: {} to arbitrator...'.format(_message.name, _message.event.name))
-                await self._arbitrate_message(_message)
-#               self._log.debug('sent message:' + Fore.WHITE + ' {}; event: {} to arbitrator.'.format(_message.name, _message.event.name))
-            elif _message.sent == -1:
-                # don't arbitrate, just keep republishing this message
-                pass
-            elif not self._permit_resend:
-                self._log.warning('message: {} already sent; event: {}'.format(_message.name, _message.event.name))
-
-#           # keep track of timestamp of last message
-#           self._log.debug('last message timestamp: {}'.format(_message.timestamp))
-#           self._message_bus.last_message_timestamp = _message.timestamp
-            # republish the message
-#           self._log.debug('awaiting republication of message:' \
-#               + Fore.WHITE + ' {}; event: {}'.format(_message.name, _message.event.name))
-            await self._message_bus.republish_message(_message)
-#           self._log.debug('message:' + Fore.WHITE + ' {} with event: {}'.format(_message.name, _message.event.name) + ' has been republished.')
-
-        elif not _ackd:
-            # if not already ack'd, acknowledge we've seen the message
-#           self._log.debug('acknowledging unacceptable message:' + Fore.WHITE + ' {}; event: {} (queue: {:d} elements)'.format(
-#                   _peeked_message.name, _peeked_message.event.name, self._message_bus.queue_size))
-            _peeked_message.acknowledge(self)
-#       self._log.debug('consume() complete on {}.'.format(self.name))
+        except Exception as e:
+            self._log.error('{} thrown during consume: {}\n{}'.format(type(e), e, traceback.format_exc()))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _done_callback(self, task):

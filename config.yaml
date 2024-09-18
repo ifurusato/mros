@@ -100,7 +100,7 @@ mros:
         monitor:
             i2c_port:                         0
             i2c_address:                   0x3C
-            contrast:                      0x7F            # 0x-00-0xFF screen brightness
+            contrast:                      0x3F            # 0x-00-0xFF screen brightness
             update_rate_hz:                   1            # update rate in Hz
             use_thread:                   False            # if an external clock is not supplied, use a thread for the update loop
             rotate:                           1            # values 0: 180°; 1: -90°; 2: 0°; 3: 90°
@@ -132,7 +132,7 @@ mros:
         step_limit:                      590000            # the number of steps to rotate once (roughly) was 570000
         break_time_ms:                     6000            # how long to wait for the IMU to settle
     stop_handler:                                          # offloads stop handling for motor controller
-        stop_ratio:                           0.25         # multiplier for stopping lambda
+        stop_ratio:                           0.50         # multiplier for stopping lambda 
         halt_ratio:                           0.85         # multiplier for halting lambda
         brake_ratio:                          0.93         # multiplier for braking lambda
     motor_controller:

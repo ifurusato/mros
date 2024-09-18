@@ -144,10 +144,11 @@ class Motor(Component):
         return self._max_observed_speed
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def add_speed_multiplier(self, name, lambda_function, clear=False):
+    def add_speed_multiplier(self, name, lambda_function, clear=True):
         '''
         Adds a named speed multiplier to the dict of lambda functions. This
-        replaces any existing lambda under the same name.
+        replaces any existing lambda under the same name. Default is to clear
+        any existing lambdas upon adding a new one.
 
         This is a function that alters the target speed as a multiplier.
 
@@ -158,7 +159,7 @@ class Motor(Component):
         if name in self.__speed_lambdas:
             self._log.warning('motor already contains a \'{}\' lambda.'.format(name))
         else:
-            self._log.info('🐟 adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
+            self._log.info('adding \'{}\' lambda to motor {}…'.format(name, self.orientation.name))
             self.__speed_lambdas[name] = lambda_function
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -184,7 +185,10 @@ class Motor(Component):
         '''
         Resets the speed multipliers to None, i.e., no function.
         '''
-        self.__speed_lambdas.clear()
+        _count = len(self.__speed_lambdas)
+        if _count > 0:
+            self._log.info('clearing {:d} speed multipliers…'.format(_count))
+            self.__speed_lambdas.clear()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -199,8 +203,11 @@ class Motor(Component):
         '''
         Lists the current speed multipliers to the log.
         '''
-        self._log.info(Fore.GREEN + '  motor {} contains {:d} lambdas.'.format(self.orientation.name, len(self.__speed_lambdas)))
-        if len(self.__speed_lambdas) > 0:
+        _count = len(self.__speed_lambdas)
+        if _count == 0:
+            self._log.info(Fore.GREEN + '  motor {} contains no lambdas.')
+        else:
+            self._log.info(Fore.GREEN + '  motor {} contains {:d} lambdas.'.format(self.orientation.name, _count))
             for _lambda in self.__speed_lambdas:
                 self._log.info(Fore.GREEN + '    speed multiplier: {}'.format(_lambda))
 
@@ -296,7 +303,7 @@ class Motor(Component):
             _current_target_speed = self.__target_speed
             _new_target_speed = target_speed 
             self.__target_speed = self._slew_limiter.limit(_current_target_speed, _new_target_speed)
-#           self._log.info(Fore.GREEN + 'current speed: {:5.2f}; target speed: {:5.2f}; slewed as: {:5.2f}'.format(
+#           self._log.info(Fore.MAGENTA + 'current speed: {:5.2f}; target speed: {:5.2f}; slewed as: {:5.2f}'.format(
 #                   _current_target_speed, _new_target_speed, self.__target_speed))
         else:
             self.__target_speed = target_speed
@@ -337,7 +344,7 @@ class Motor(Component):
         '''
         Returns True if the motor is entirely stopped, or very nearly stopped.
         '''
-        return isclose(self.current_power, 0.0, abs_tol=1e-2)
+        return isclose(self.get_current_power(settle_to_zero=False), 0.0, abs_tol=1e-2)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -347,7 +354,8 @@ class Motor(Component):
         setting of the motor is not equal to zero. Note that this returns
         False if the value is very close to zero.
         '''
-        return self.current_power != 0.0
+#       return self.get_current_power() != 0.0
+        return not isclose(self.get_current_power(settle_to_zero=False), 0.0, abs_tol=1e-2)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -356,7 +364,7 @@ class Motor(Component):
         Returns True if the motor is moving ahead (forward), i.e., if the
         current power setting of the motor is greater than zero.
         '''
-        return self.current_power > 0.0
+        return self.get_current_power() > 0.0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -365,7 +373,7 @@ class Motor(Component):
         Returns True if the motor is moving astern (reverse), i.e., if the
         current power setting of the motor is less than zero.
         '''
-        return self.current_power < 0.0
+        return self.get_current_power() < 0.0
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def update_target_speed(self):
@@ -397,7 +405,7 @@ class Motor(Component):
 #                       self._log.info(Fore.WHITE + 'set: {:5.2f}; before: {:5.2f}; target: {:5.2f}; {} lambda for {} motor.'.format(
 #                               self.__target_speed, _before_lambda_speed, self.__modified_target_speed, _name, self._orientation.label))
                 if isinstance(_returned_value, str):
-                    # this only should apply to brake, halt and stop.
+                    # the lambda name was returned; this only should apply to brake, halt and stop.
                     _lambda_name = _returned_value
                     self.remove_speed_multiplier(_lambda_name)
                     self._pid_controller.set_speed(0.0)
@@ -418,18 +426,17 @@ class Motor(Component):
 
         :param target_power:  the target motor power
         '''
+#       self._log.info(Fore.BLUE + 'set motor power: {}'.format(target_power))
         if target_power is None:
             raise ValueError('null target_power argument.')
         elif not self.enabled and target_power > 0.0: # though we'll let the power be set to zero
             raise Exception('motor {} not enabled.'.format(self.orientation.name))
         # even if disabled or suppressed, JerkLimiter still clips
 #       if self._jerk_limiter:
-#           target_power = self._jerk_limiter.limit(self.current_power, target_power)
+#           target_power = self._jerk_limiter.limit(self.get_current_power(), target_power)
         # keep track of highest-applied target power
         self.__max_applied_power = max(abs(target_power), self.__max_applied_power)
-
         _driving_power = round(self._power_clip(float(target_power * self.max_power_ratio)), 4) # round to 4 decimal
-
         if self._orientation is Orientation.PFWD:
 #           self._log.info(Fore.RED   + 'target power {:5.2f} converted to driving power {:<5.2f} for PFWD motor.'.format(target_power, _driving_power))
             self._tb.SetMotor1(_driving_power)
@@ -461,8 +468,7 @@ class Motor(Component):
         return self._tb
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    @property
-    def current_power(self):
+    def get_current_power(self, settle_to_zero=True):
         '''
         Makes a best attempt at getting the current power value from the motors.
         Note that the motor controller does not report absolute zero when the
@@ -474,26 +480,29 @@ class Motor(Component):
         level to zero. We could have done this elsewhere but it would have been
         more complicated. Because the motors can't move with so little power
         it's just a waste of battery power to do so.
+
+        If you want to avoid the side effect, call this method with the
+        'settle_to_zero' argument as False (default is True).
         '''
-        value = None
+        _value = None
         count = 0
-        if self._orientation is Orientation.PFWD or self._orientation is Orientation.PMID or self._orientation is Orientation.PAFT:
-            while value == None and count < 20:
+        if self._orientation.side is Orientation.PORT:
+            while _value == None and count < 20:
                 count += 1
-                value = self._tb.GetMotor1()
-                time.sleep(0.001)
-            if value == None or isclose(value, 0.0, abs_tol=1e-1):
-                value = 0.0
-                self._tb.SetMotor1(value)
-        elif self._orientation is Orientation.SFWD or self._orientation is Orientation.SMID or self._orientation is Orientation.SAFT:
-            while value == None and count < 20:
+                _value = self._tb.GetMotor1()
+#               time.sleep(0.001)
+            if settle_to_zero and (_value == None or isclose(_value, 0.0, abs_tol=1e-1)):
+                _value = 0.0
+                self._tb.SetMotor1(_value)
+        elif self._orientation.side is Orientation.STBD:
+            while _value == None and count < 20:
                 count += 1
-                value = self._tb.GetMotor2()
-                time.sleep(0.001)
-            if value == None or isclose(value, 0.0, abs_tol=1e-2):
-                value = 0.0
-                self._tb.SetMotor2(value)
-        return value
+                _value = self._tb.GetMotor2()
+#               time.sleep(0.001)
+            if settle_to_zero and (_value == None or isclose(_value, 0.0, abs_tol=1e-2)):
+                _value = 0.0
+                self._tb.SetMotor2(_value)
+        return _value
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property

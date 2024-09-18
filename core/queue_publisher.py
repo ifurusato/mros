@@ -48,12 +48,12 @@ class QueuePublisher(Publisher):
         Publisher.__init__(self, 'queue', config, message_bus, message_factory, suppressed=False, level=level)
         _cfg = self._config['mros'].get('publisher').get('queue')
         _loop_freq_hz  = _cfg.get('loop_freq_hz')
-        self._log.info('🐙 queue publisher loop frequency: {:d}Hz'.format(_loop_freq_hz))
+        self._log.info('queue publisher loop frequency: {:d}Hz'.format(_loop_freq_hz))
         self._publish_delay_sec = 1.0 / _loop_freq_hz
         self._queue    = DeQueue()
         self._counter  = itertools.count()
 #       globals.put('queue-publisher', self)
-        self._log.info('🐙 ready.')
+        self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     @property
@@ -63,12 +63,12 @@ class QueuePublisher(Publisher):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def put(self, message):
         if not self.enabled:
-            self._log.warning('🐙 message {} ignored: queue publisher disabled.'.format(message.name))
+            self._log.warning('message {} ignored: queue publisher disabled.'.format(message.name))
         elif not self.is_active:
-            self._log.warning('🐙 message {} ignored: queue publisher inactive.'.format(message.name))
+            self._log.warning('message {} ignored: queue publisher inactive.'.format(message.name))
         else:
             self._queue.put(message)
-            self._log.info('🐙 put message \'{}\' ({}) into queue ({:d} {})'.format(
+            self._log.info('put message \'{}\' ({}) into queue ({:d} {})'.format(
                     message.event.name, message.name, self._queue.size, 'item' if self._queue.size == 1 else 'items'))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -78,9 +78,9 @@ class QueuePublisher(Publisher):
             if self._message_bus.get_task_by_name(QueuePublisher._PUBLISHER_LOOP):
                 raise Exception('already enabled.')
             else:
-                self._log.info('🐙 creating task for publisher loop...')
+                self._log.info('creating task for publisher loop...')
                 self._message_bus.loop.create_task(self._publisher_loop(lambda: self.enabled), name=QueuePublisher._PUBLISHER_LOOP)
-                self._log.info('🐙 enabled.')
+                self._log.info('enabled.')
         else:
             self._log.warning('failed to enable publisher loop.')
 
@@ -90,20 +90,20 @@ class QueuePublisher(Publisher):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     async def _publisher_loop(self, f_is_enabled):
-        self._log.info('🐙 starting queue publisher loop:\t' + Fore.YELLOW + ( '; (suppressed, type \'m\' to release)' if self.suppressed else '(released)') )
+        self._log.info('starting queue publisher loop:\t' + Fore.YELLOW + ( '; (suppressed, type \'m\' to release)' if self.suppressed else '(released)') )
         while f_is_enabled():
             _count = next(self._counter)
             self._log.debug('[{:03d}] begin publisher loop...'.format(_count))
             if not self.suppressed:
                 while not self._queue.empty:
                     _message = self._queue.poll()
-                    self._log.info('🐙 [{:03d}] published message '.format(_count)
+                    self._log.info('[{:03d}] published message '.format(_count)
                             + Fore.WHITE + '{} '.format(_message.name)
                             + Fore.CYAN + 'for event \'{}\' with group \'{}\' and value: '.format(_message.event.name, _message.event.group.name)
                             + Fore.YELLOW + '{}'.format(_message.payload.value))
                     await Publisher.publish(self, _message)
             else:
-                self._log.info('🐙 suppressed.')
+                self._log.info('suppressed.')
             await asyncio.sleep(self._publish_delay_sec)
         self._log.info('publisher loop complete.')
 

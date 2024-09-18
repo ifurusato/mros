@@ -186,8 +186,10 @@ class MotionController(Subscriber):
 
         :param message:  the message to process.
         '''
+        if message is None:
+            raise ValueError('unexpected null message argument.')
         _event = message.event
-#       self._log.debug('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
+        self._log.info('😨 pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         _value = message.value
         self._repeat_event = False
         _event_num = _event.num
@@ -206,8 +208,31 @@ class MotionController(Subscriber):
             _events = _sensor_data.events
             _fop_cm = _sensor_data.fop_cm
             _fos_cm = _sensor_data.fos_cm
-            self._log.info('handling bumper events: {}; fop {:d}cm; fos: {:d}cm'.format(_events, _fop_cm, _fos_cm))
-            self._stop_handler.process_message(message)
+            _x = '''
+                BUMPER_ANY  = "any bumper"              4
+                BUMPER_MAST = "mast bumper"             4
+                BUMPER_PORT = "port bumper"             4
+                BUMPER_CNTR = "center bumper"           4
+                BUMPER_STBD = "starboard bumper"        4
+                BUMPER_PFWD = "port fwd bumper"         4
+                BUMPER_PAFT = "port aft bumper"         4
+                BUMPER_SFWD = "starboard fwd bumper"    4
+                BUMPER_SAFT = "starboard aft bumper"    4
+                BUMPER_FOBP = "fwd oblique port"       10
+                BUMPER_FOBS = "fwd oblique starboard"  10
+            '''
+            _priority = 0
+            for _event in _events:
+                _priority = min(_priority, _event.priority)
+            
+            # get highest priority, either 4 or 10
+            self._log.info('handling bumper events: {}; fop {:d}cm; fos: {:d}cm; priority: {}'.format(_events, _fop_cm, _fos_cm, _priority))
+            if _priority == 10:
+                self._log.info('😨 causing halt; events {}'.format(_events))
+                self._stop_handler.halt()
+            else:
+                self._log.info('😨 causing stop; events {}'.format(_events))
+                self._stop_handler.stop()
 
         elif _event.group is Group.IMU:
             if self._motor_controller.is_stopped:
@@ -238,7 +263,6 @@ class MotionController(Subscriber):
             if _value == 0:
                 self._log.info('handling R1_BUTTON; value: {} rotation: clockwise'.format(_value))
                 self._motor_controller.rotate(Rotation.CLOCKWISE)
-#               self.set_manual_speed()
 
         elif _event_num == Event.L2_BUTTON.num:
             if _value == 0:
@@ -248,7 +272,7 @@ class MotionController(Subscriber):
         elif _event_num == Event.R2_BUTTON.num: # R2_BUTTON = ( 48, "r2",         10, Group.GAMEPAD)
 #           self._handle_gamepad_R2_BUTTON(_value)
             if _value == 0:
-                self._log.info('handling R2_BUTTON; value: {} slow to stop'.format(_value))
+                self._log.info('handling R2_BUTTON; value: {} rotation: clockwise'.format(_value))
                 self.brake()
 #               self.halt()
 #               self.stop()
@@ -384,7 +408,7 @@ class MotionController(Subscriber):
         Gets the outer angle based on the inner angle and calls the
         servo controller to perform the move.
         '''
-        print('🦊 A.')
+        print('🌸 A. port motor ratio: {}; stbd motor ratio: {}'.format(self._port_motor_ratio, self._stbd_motor_ratio))
         if inner_angle != self._afrs_angle: # only pay attention to changes
             self.set_steering_mode(SteeringMode.AFRS)
 #           self._servo_controller.set_mode(SteeringMode.AFRS)
@@ -396,7 +420,7 @@ class MotionController(Subscriber):
             _style = Style.NORMAL
 #           self._afrs_max_ratio = _cfg.get('afrs_max_ratio') # ratio at maximum turn
             if inner_angle == 0: # no rotation
-                print('🦊 B. no rotation')
+                print('🌸 B. no rotation')
                 _style = Style.BRIGHT
                 _direction = Direction.AHEAD
                 _port_angle = 0.0
@@ -406,7 +430,7 @@ class MotionController(Subscriber):
                 Player.instance().play_from_thread(Sound.ZZT) # HZAH
 
             elif inner_angle < 0: # counter-clockwise (port is inner)
-                print('🦊 C. counter-clockwise')
+                print('🌸 C. counter-clockwise')
                 _style = Fore.RED
                 _direction = Direction.COUNTER_CLOCKWISE
                 self._port_motor_ratio = self.steering_translation(-1 * inner_angle)
@@ -415,7 +439,7 @@ class MotionController(Subscriber):
                 _stbd_angle = _outer_angle
 
             else: # clockwise (stbd is inner)
-                print('🦊 D. clockwise')
+                print('🌸 D. clockwise')
                 _style = Fore.GREEN
                 _direction = Direction.CLOCKWISE
                 self._port_motor_ratio = 1.0
@@ -597,9 +621,8 @@ class MotionController(Subscriber):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _handle_gamepad_Y_BUTTON(self, value):
-        self._log.warning(Style.BRIGHT + 'SHOULD NOT BE handling Y_BUTTON; value: {}'.format(value))
+        raise Exception('should not be handling Y_BUTTON in motion controller directly; value: {}'.format(value))
 #       self._shutdown()
-        pass
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _handle_gamepad_R2_BUTTON(self, value):
@@ -986,7 +1009,6 @@ class MotionController(Subscriber):
             # alter steering servos for mode
             self.reposition(steering_mode, self._set_steering_mode_callback)
 
-        print('💙 e.')
         # set mode for motors
         if steering_mode is SteeringMode.AFRS:
             print('💙 f. AFRS...')
@@ -1131,16 +1153,19 @@ class MotionController(Subscriber):
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def brake(self):
+        self._log.info("🍀 calling brake…")
         _braked_lambda = lambda: self._log.info("🍀 brake complete.")
         self._stop_handler.brake(callback=_braked_lambda)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def halt(self):
+        self._log.info("🍀 calling halt…")
         _halted_lambda = lambda: self._log.info("🍀 halt complete.")
         self._stop_handler.halt(callback=_halted_lambda)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def stop(self):
+        self._log.info("🍀 calling stop…")
         _stopped_lambda = lambda: self._log.info("🍀 stop complete.")
         self._stop_handler.stop(callback=_stopped_lambda)
 
@@ -1168,7 +1193,6 @@ class MotionController(Subscriber):
         '''
         Closes both the motors and servos.
         '''
-        print('🍊 motion controller close.')
         if not self.closed:
             Subscriber.close(self) # calls disable
             self._log.info('motion controller closed.')

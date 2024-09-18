@@ -142,8 +142,12 @@ class MotorController(Component):
         _speeds = []
         if orientation is Orientation.CNTR:
             for _motor in self._get_motors():
-                self._log.info('AVERAGING with speed of {} motor speed: modified={:.2f}; speed={:.2f}; target={:.2f}'.format(_motor.orientation.name,
-                        _motor.modified_speed, _motor.target_speed, _motor.target_speed))
+                if len(_speeds) < 2:
+                    _mean = 0.0
+                else:
+                    _mean = statistics.fmean(_speeds)
+                self._log.info('averaging with speed of {} motor: modified={:.2f}; speed={:.2f}; target={:.2f}; mean: {:4.2f}'.format(_motor.orientation.name,
+                        _motor.modified_speed, _motor.target_speed, _motor.target_speed, _mean))
                 _speeds.append(_motor.target_speed)
 #               _speeds.append(_motor.modified_speed)
 

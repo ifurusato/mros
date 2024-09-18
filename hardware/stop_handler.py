@@ -10,7 +10,9 @@
 # modified: 2024-06-24
 #
 
+import traceback # TEMP
 import time
+import types
 from datetime import datetime as dt
 import itertools
 from math import isclose
@@ -67,14 +69,14 @@ class StopHandler(Component):
         self._log.info('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         _value = message.value
         if _event.num != self._last_event:
-            if _event.num == Event.EMERGENCY_STOP.num:
-                self._emergency_stop()
-            elif _event.num == Event.BRAKE.num:
-                pass
+            if _event.num == Event.BRAKE.num:
+                self.brake()
             elif _event.num == Event.HALT.num:
                 self.halt()
             elif _event.num == Event.STOP.num:
-                self.stop(_event)
+                self.stop()
+            elif _event.num == Event.EMERGENCY_STOP.num:
+                self._emergency_stop()
             else:
                 raise Exception('unrecognised stop event: {}'.format(_event.name))
         self._last_event = _event.num
@@ -91,7 +93,9 @@ class StopHandler(Component):
         Slowly coasts all motors to a stop.
         Executes the callback once the robot is no longer moving.
         '''
-        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍉 BRAKE.')
+        self._log.info('brake.')
+        if callback is None:
+            callback = lambda: self._log.info('brake complete.')
         self._stopping_function(lambda_name=StopHandler.BRAKE_LAMBDA_NAME, lambda_function=self._braking_lambda, timeout_ms=6000, callback=callback)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -100,7 +104,9 @@ class StopHandler(Component):
         Quickly (but not immediately) stops all motors.
         Executes the callback once the robot is no longer moving.
         '''
-        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍇 HALT.')
+        self._log.info('halt.')
+        if callback is None:
+            callback = lambda: self._log.info('halt complete.')
         self._stopping_function(lambda_name=StopHandler.HALT_LAMBDA_NAME, lambda_function=self._halting_lambda, timeout_ms=2500, callback=callback)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -109,7 +115,9 @@ class StopHandler(Component):
         Stops all motors very quickly.
         Executes the callback once the robot is no longer moving.
         '''
-        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍋 STOP.')
+        self._log.info('stop.')
+        if callback is None:
+            callback = lambda: self._log.info('stop complete.')
         self._stopping_function(lambda_name=StopHandler.STOP_LAMBDA_NAME, lambda_function=self._stopping_lambda, timeout_ms=1000, callback=callback)
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -117,18 +125,17 @@ class StopHandler(Component):
         '''
         Halts the robot. Executes the callback once the robot has stopped.
         '''
-        self._log.info(Fore.YELLOW + Style.BRIGHT + '🍐 HALT with timeout of {:d}ms.'.format(timeout_ms))
+        if callback is not None and not isinstance(callback, types.FunctionType):
+            raise ValueError('expected an callback argument, not {}'.format(type(callback)))
+        self._log.info('stopping function: {} with timeout of {:d}ms.'.format(lambda_name, timeout_ms))
         if self._motor_controller.is_stopped:
-            print('🍐 b. is stopped.')
             # just in case a motor is still moving
             for _motor in self._all_motors:
                 _motor.stop()
             self._log.warning('already halted.')
         elif self._motor_controller.is_stopping():
-            print('🍐 c. is stopping.')
             self._log.warning('already halting.')
         else:
-            print('🍐 d. else...')
             self._log.info('halting…')
             if self._slew_limiter_enabled:
                 self._log.info('soft halt…')
@@ -143,24 +150,26 @@ class StopHandler(Component):
                         while not self._motor_controller.is_stopped and _elapsed_ms < timeout_ms:
                             _count = next(_counter)
                             _elapsed_ms = int((dt.now() - _start_time).total_seconds() * 1000)
-                            print('🍐 [{}] g. waiting til stopped: {:d}ms elapsed.'.format(_count, _elapsed_ms))
+                            self._log.info(Style.DIM + '[{:02d}] waiting til stopped; {:4d}ms elapsed.'.format(_count, _elapsed_ms))
                             time.sleep(0.1)
-                        print('🍐 h. stopped.')
+                        self._log.info('stopped.')
                         # TODO check if timed out and still moving? If so, emergency stop...
                 finally:
-                    print('🍐 h. removing motor lambdas…')
-                    # remove stopping lambdas from motors
+                    self._log.info('removing motor lambdas…')
                     for _motor in self._all_motors:
                         _motor.remove_speed_multiplier(lambda_name)
             else:   
-                print('🍐 i.')
                 self._log.info('hard halt…')
                 for _motor in self._all_motors:
                     _motor.stop()
         # done .....................
         if callback:
-            print('🍐 y. executing callback…')
-            callback()
+            try:
+                self._log.info('executing callback of type: {}…'.format(type(callback)))
+                callback()
+            except Exception as e:
+                self._log.error('{} thrown executing callback: {}\n{}'.format(type(e), e, traceback.format_exc()))
+
         print('🍐 z. halt complete.')
 
     # lambda functions ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -188,7 +197,6 @@ class StopHandler(Component):
         '''
         The halt lambda.
         '''
-#       target_speed = target_speed * self._brake_ratio
         target_speed = target_speed * self._halt_ratio
         if self._motor_controller.all_motors_are_stopped:
             return StopHandler.HALT_LAMBDA_NAME

@@ -462,13 +462,13 @@ class SensorArray(Publisher):
                 if _sensor_data.signature != self._last_sensor_data.signature:
                     self._last_sensor_data = _sensor_data
                     _message = self.message_factory.create_message(Event.BUMPER_ANY, _sensor_data)
-                    if self._verbose:
-                        self._log.info('sensor data:\n{}'.format(_sensor_data))
+#                   if self._verbose:
+                    self._log.info('🦋 sensor data:\n{}'.format(_sensor_data))
                     # publish message
-                    self._log.info('publishing sensor data: ' + Fore.WHITE + '{}'.format(_sensor_data.signature))
+                    self._log.info('🦋 publishing sensor data: ' + Fore.WHITE + '{}'.format(_sensor_data.signature))
     #               self._queue_publisher.put(_message) 
                     await Publisher.publish(self, _message)
-                    self._log.info('published sensor data.')
+                    self._log.info('🦋 published sensor data.')
     
                 else:
                     if self._verbose:

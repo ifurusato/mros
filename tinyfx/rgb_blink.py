@@ -24,7 +24,7 @@ class RgbBlinkFX(Cycling):
     :param:   speed   the speed of the blink, where 1.0 is 1 second, 0.5 is 2 seconds, etc.
     :param:   phase   the phase of the blink
     :param:   duty    the duty cycle of the blink
-    :param:   color   the color or colors of the blink
+    :param:   color   an RGB tuple as the color or colors of the blink
     '''
     def __init__(self, speed=1, phase=0.0, duty=0.5, color=None):
         super().__init__(speed)

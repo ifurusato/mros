@@ -202,8 +202,13 @@ class Velocity(object):
     @property
     def value(self):
         '''
-        Returns the current velocity value as a property.
+        Returns the current velocity value as a property. If the motors is
+        stopped this always returns 0.0.
         '''
+#       if self._motor.is_stopped:
+#           return 0.0
+#       else:
+#           return self._velocity
         return self._velocity
 
 #   def __call__(self):
