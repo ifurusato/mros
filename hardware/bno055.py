@@ -36,6 +36,7 @@ from rgbmatrix5x5 import RGBMatrix5x5
 
 from core.logger import Level, Logger
 from core.orientation import Orientation
+from core.rate import Rate
 from core.message import Message
 from core.cardinal import Cardinal
 from core.convert import Convert
@@ -90,6 +91,7 @@ class BNO055:
         self._config = config
         _cfg = self._config['mros'].get('hardware').get('bno055')
         self._bno_mode           = BNO055Mode.from_name(_cfg.get('mode'))
+        self._poll_rate_hz       = _cfg.get('poll_rate_hz')
         self._pitch_trim         = _cfg.get('pitch_trim')
         self._roll_trim          = _cfg.get('roll_trim')
         self._euler_heading_trim = _cfg.get('euler_heading_trim')
