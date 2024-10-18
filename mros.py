@@ -273,10 +273,6 @@ class MROS(Component, FiniteStateMachine):
 
         if _cfg.get('enable_system_subscriber') or 's' in _subs:
             self._system_subscriber = SystemSubscriber(self._config, self, self._message_bus, level=self._level)
-#           self._system_subscriber.enable()
-
-        if _cfg.get('enable_remote_ctrl_subscriber') or 'r' in _subs:
-            self._remote_ctrl_subscriber = RemoteControlSubscriber(self._config, self._message_bus, level=self._level)
 
 #       if _cfg.get('enable_macro_subscriber'):
 #           if not self._macro_publisher:
@@ -356,6 +352,9 @@ class MROS(Component, FiniteStateMachine):
 
         self._log.info('configure tinyfx controller…')
         self._tinyfx = TinyFxController(self._config)
+
+        if _cfg.get('enable_remote_ctrl_subscriber') or 'r' in _subs:
+            self._remote_ctrl_subscriber = RemoteControlSubscriber(self._config, self._message_bus, level=self._level)
 
         # add task selector ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         if self._slow_irq_clock:
@@ -710,7 +709,7 @@ class MROS(Component, FiniteStateMachine):
                     _name, _component = _registry.popitem(last=True)
                     if not isinstance(_component, Publisher) and not isinstance(_component, Subscriber) \
                             and _component != self and _component != self._message_bus:
-                        self._log.info(Style.BRIGHT + '💀 closing component \'{}\' ({})…'.format(_name, _component.classname))
+                        self._log.info(Style.DIM + 'closing component \'{}\' ({})…'.format(_name, _component.classname))
                         _component.close()
                 time.sleep(0.1)
                 if self._message_bus and not self._message_bus.closed:

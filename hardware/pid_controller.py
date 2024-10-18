@@ -70,7 +70,7 @@ class PIDController(Component):
         self._power        = 0.0
         self._last_power   = 0.0
         self._last_time = dt.now() # for calculating elapsed time
-        self._verbose      = False
+        self._verbose      = True
         self._log.info('ready.')
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -151,19 +151,24 @@ class PIDController(Component):
                 self._pid.setpoint = 0.0
                 self._pid.target   = 0.0
                 self._power        = 0.0
+#               self._motor.get_velocity().reset_steps()
                 self._motor.set_motor_power(0.0)
                 if self._verbose:
-                    if _count % 20 == 0:
-                        self._log.info(Fore.WHITE + Style.DIM + 'target speed: {:5.2f}; stopped; power: {:4.2f};\tvelocity: {:4.2f}'.format(target_speed, self._power, self._motor.velocity))
+#                   if _count % 20 == 0:
+#                       self._log.info(Fore.WHITE + Style.DIM + 'target speed: {:5.2f}; stopped; power: {:4.2f};\tvelocity: {:4.2f}'.format(target_speed, self._power, self._motor.velocity))
+                    pass
             else:
                 self._pid.setpoint = target_speed
                 # converts speed to power...
                 self._pid.target = self._motor.velocity
+
+                _error = self._pid.setpoint - self._pid.target
+
                 _pid_output = self._pid()
 #               _pid_output = self._pid(self._motor.velocity)
 #               if _changed:
                 self._power += _pid_output
-                self._log.info(Fore.YELLOW + '_pid_output: {:4.2f};\t_power: {:4.2f};\tvelocity: {:4.2f}'.format(_pid_output, self._power, self._motor.velocity))
+#               self._log.info(Fore.YELLOW + '_pid_output: {:4.2f};\t_power: {:4.2f};\tvelocity: {:4.2f}'.format(_pid_output, self._power, self._motor.velocity))
                 _motor_power = self._power
                 self._motor.set_motor_power(_motor_power)
 
@@ -176,6 +181,8 @@ class PIDController(Component):
                         self._log.info(Fore.YELLOW + 'target speed: {:5.2f}; current speed: {:5.2f};'.format(target_speed, self._motor.target_speed)
                                 + Fore.GREEN + Style.NORMAL + ' pid.setpoint: {:5.2f}; pid output: {:5.2f};'.format(self._pid.setpoint, _pid_output)
 #                               + Fore.MAGENTA + ' kp: {:7.4f}; ki: {:7.4f}; kd: {:7.4f})'.format(self._pid.kp, self._pid.ki, self._pid.kd)
+#                               + Fore.YELLOW + ' velocity: {:<5.2f};'.format(self._motor.velocity)
+                                + Fore.MAGENTA + ' error: {:<5.2f};'.format(_error)
                                 + Fore.WHITE + ' motor power: {:<5.2f};'.format(_motor_power)
                                 + Fore.CYAN + Style.NORMAL + ' elapsed: {:d}ms'.format(_elapsed_ms))
 

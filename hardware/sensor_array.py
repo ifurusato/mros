@@ -89,7 +89,7 @@ class SensorArray(Publisher):
         self._log.info('bumper pin assignments:         '
                 + Fore.RED   + ' port bottom={:d}; top={:d};'.format(self._bpb_pin, self._bpt_pin)
                 + Fore.GREEN + ' stbd bottom={:d}; top={:d}'.format(self._bsb_pin, self._bst_pin))
-        self._fop_pin = _cfg.get('fop_pin') # 7 oblique fore port
+        self._fop_pin = _cfg.get('fop_pin') # 9 was 7 oblique fore port
         self._fos_pin = _cfg.get('fos_pin') # 8 oblique fore starboard
         self._log.info('oblique sensor pin assignments: '
                 + Fore.RED   + ' port={:d};'.format(self._fop_pin)

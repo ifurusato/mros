@@ -1082,14 +1082,14 @@ class MotionController(Subscriber):
     def _state_changed(self):
         self._log.info('ready.')
         if self._motor_controller.is_stopped:
-            self._log.info('state: stopped.')
+            self._log.info('state: ' + Style.BRIGHT + 'stopped.')
             if self._suppress_monitors:
                 if self._monitor:
                     self._monitor.enable()
                 if self._screen:
                     self._screen.enable()
         else:
-            self._log.info('state: moving.')
+            self._log.info('state: ' + Style.BRIGHT + 'moving.')
             if self._suppress_monitors:
                 if self._monitor:
                     self._monitor.disable()
@@ -1101,8 +1101,6 @@ class MotionController(Subscriber):
         self._log.info(Fore.CYAN + Style.BRIGHT + 'shutting down!')
         self.disable()
         self.close()
-        if self._mros:
-            self._mros.shutdown()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def enable(self):

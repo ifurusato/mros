@@ -163,8 +163,10 @@ class PID(object):
             output = self._last_output
         else:
             # compute error terms
+            # FIXME setpoint and target?
             _error = self._setpoint - self._target
             d_input = self._target - (self._last_input if self._last_input is not None else self._target)
+#           self._log.info(Fore.MAGENTA + 'error: {:5.2f}'.format(_error))
             # compute the proportional, integral and derivative terms
             self._proportional = self._kp * _error
             self._integral    += self._ki * _error * dt

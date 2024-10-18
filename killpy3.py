@@ -41,7 +41,7 @@ try:
     else:
         print(Fore.GREEN + '-- no python3 processes found.' + Style.RESET_ALL)
 except Exception as e:
-    print(Fore.RED + 'error in motor test: {}'.format(e) + Style.RESET_ALL)
+    print(Fore.RED + 'error killing python3 processes: {}'.format(e) + Style.RESET_ALL)
     traceback.print_exc(file=sys.stdout)
 
 #EOF

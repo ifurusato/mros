@@ -490,7 +490,6 @@ class Motor(Component):
             while _value == None and count < 20:
                 count += 1
                 _value = self._tb.GetMotor1()
-#               time.sleep(0.001)
             if settle_to_zero and (_value == None or isclose(_value, 0.0, abs_tol=1e-1)):
                 _value = 0.0
                 self._tb.SetMotor1(_value)
@@ -498,7 +497,6 @@ class Motor(Component):
             while _value == None and count < 20:
                 count += 1
                 _value = self._tb.GetMotor2()
-#               time.sleep(0.001)
             if settle_to_zero and (_value == None or isclose(_value, 0.0, abs_tol=1e-2)):
                 _value = 0.0
                 self._tb.SetMotor2(_value)

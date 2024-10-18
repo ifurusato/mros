@@ -15,6 +15,7 @@ from fractions import Fraction
 from colorama import init, Fore, Style
 init()
 
+from core.component import Component
 from core.logger import Logger, Level
 from core.orientation import Orientation
 from hardware.i2c_scanner import I2CScanner
@@ -22,7 +23,7 @@ from hardware.motor import Motor
 from hardware.decoder import Decoder
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-class MotorConfigurer():
+class MotorConfigurer(Component):
     '''
     Configures either a ThunderBorg motor controller for a pair of motors.
 
@@ -33,6 +34,7 @@ class MotorConfigurer():
     '''
     def __init__(self, config, i2c_scanner, motors_enabled=False, level=Level.INFO):
         self._log = Logger("motor-config", level)
+        Component.__init__(self, self._log, suppressed=False, enabled=True)
         if config is None:
             raise ValueError('null configuration argument.')
         self._config = config

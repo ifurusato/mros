@@ -252,7 +252,7 @@ class MessageBus(Component):
         if publisher in self._publishers:
             raise ValueError('publisher list already contains \'{}\''.format(publisher.name))
         self._publishers.append(publisher)
-        self._log.info('registered publisher: \'{}\'; {:d} publisher{} in list.'.format( \
+        self._log.info('🥃 registered publisher: \'{}\'; {:d} publisher{} in list.'.format( \
                 publisher.name, len(self._publishers), 's' if len(self._publishers) > 1 else ''))
 
     def get_publisher(self, name):

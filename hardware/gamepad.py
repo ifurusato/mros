@@ -328,11 +328,9 @@ class Gamepad(Component):
                 self._log.warning("D-Pad Vertical(N) {}".format(event.value))
                 return None
             elif _control == GamepadMapping.DPAD_UP:
-#               self._log.info("D-Pad UP {}".format(event.value))
-                pass
+                self._log.info("D-Pad UP {}".format(event.value))
             elif _control == GamepadMapping.DPAD_DOWN:
-#               self._log.info("D-Pad DOWN {}".format(event.value))
-                pass
+                self._log.info("D-Pad DOWN {}".format(event.value))
             elif event.code == GamepadMapping.L3_VERTICAL.code:
                 self._log.debug(Fore.MAGENTA + "L3 Vertical {}".format(event.value))
 #               _control = GamepadMapping.R3_VERTICAL

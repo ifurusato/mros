@@ -143,6 +143,7 @@ class Velocity(object):
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def reset_steps(self):
         self._steps_begin = 0
+#       self._steps_begin = self._motor.steps
         self._stepcount_timestamp = time.perf_counter()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
@@ -176,18 +177,22 @@ class Velocity(object):
                     # we multiply our step count by the percentage error to obtain
                     # what would be the step count for our 50.0ms period
                     _diff_steps = _steps - self._steps_begin
-#                   self._log.info(Fore.BLUE + '{:+d} steps diff'.format(_diff_steps))
-                    _time_error_percent = _time_error_ms / self._period_ms
-                    _corrected_diff_steps = _diff_steps + ( _diff_steps * _time_error_percent )
-                    # multiply the steps per period by the loop frequency (20) to get steps/second
-                    _steps_per_sec = _corrected_diff_steps * self._freq_hz
-                    _cm_per_sec = self.steps_to_cm(_steps_per_sec)
-                    self._velocity = _cm_per_sec
-                    self._max_velocity = max(self._velocity, self._max_velocity)
-#                   if _steps % 10 == 0:
-#                       self._log.info(Fore.BLUE + '{:+d} steps, {:+d}/{:5.2f} diff/corrected; time diff: {:>5.2f}ms; error: {:>5.2f}%;\t'.format(
-#                               self._motor.steps, _diff_steps, _corrected_diff_steps, _time_diff_ms, _time_error_percent * 100.0)
-#                               + Fore.YELLOW + 'motor power: {}; velocity: {:>5.2f} steps/sec; {:<5.2f}cm/sec'.format(self._motor.last_power, _steps_per_sec, self._velocity))
+                    if _diff_steps == 0:
+#                       self._log.info(Fore.BLUE + Style.DIM + '{:+d} steps diff'.format(_diff_steps))
+                        self._velocity = 0.0
+                    else:
+#                       self._log.info(Fore.BLUE + '{:+d} steps diff'.format(_diff_steps))
+                        _time_error_percent = _time_error_ms / self._period_ms
+                        _corrected_diff_steps = _diff_steps + ( _diff_steps * _time_error_percent )
+                        # multiply the steps per period by the loop frequency (20) to get steps/second
+                        _steps_per_sec = _corrected_diff_steps * self._freq_hz
+                        _cm_per_sec = self.steps_to_cm(_steps_per_sec)
+                        self._velocity = _cm_per_sec
+                        self._max_velocity = max(self._velocity, self._max_velocity)
+#                       if _steps % 10 == 0:
+#                           self._log.info(Fore.BLUE + '{:+d} steps, {:+d}/{:5.2f} diff/corrected; time diff: {:>5.2f}ms; error: {:>5.2f}%;\t'.format(
+#                                   self._motor.steps, _diff_steps, _corrected_diff_steps, _time_diff_ms, _time_error_percent * 100.0)
+#                                   + Fore.YELLOW + 'motor power: {}; velocity: {:>5.2f} steps/sec; {:<5.2f}cm/sec'.format(self._motor.last_power, _steps_per_sec, self._velocity))
                 self._stepcount_timestamp = time.perf_counter()
                 self._steps_begin = _steps
 #               self._log.info(Fore.BLUE + '{:+d} steps, {:+d} begin'.format(self._motor.steps, self._steps_begin))
@@ -205,11 +210,11 @@ class Velocity(object):
         Returns the current velocity value as a property. If the motors is
         stopped this always returns 0.0.
         '''
-#       if self._motor.is_stopped:
-#           return 0.0
-#       else:
-#           return self._velocity
-        return self._velocity
+        if self._motor.is_stopped:
+            return 0.0
+        else:
+            return self._velocity
+#       return self._velocity
 
 #   def __call__(self):
 #       '''

@@ -94,7 +94,7 @@ class MotorController(Component):
         # slew limiters are on motors, not here
         self._slew_limiter_enabled = config['mros'].get('motor').get('enable_slew_limiter')
         # motor controller ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-        _motor_configurer    = MotorConfigurer(config, _i2c_scanner, motors_enabled=True, level=level)
+        _motor_configurer = MotorConfigurer(config, _i2c_scanner, motors_enabled=True, level=level)
         self._pfwd_motor     = _motor_configurer.get_motor(Orientation.PFWD)
         self._sfwd_motor     = _motor_configurer.get_motor(Orientation.SFWD)
         self._pmid_motor     = _motor_configurer.get_motor(Orientation.PMID)
@@ -724,49 +724,49 @@ class MotorController(Component):
                             self._paft_motor.target_speed, self._paft_motor.modified_speed)
                     + Fore.CYAN  + ' :: '
                     + Fore.GREEN + 'saft: {:<4.2f} / {:<4.2f}'.format(
-                            self._saft_motor.target_speed, self._saft_motor.modified_speed)
-                    + Fore.CYAN + ' :: movement: {}'.format(self._characterise_movement()))
+                            self._saft_motor.target_speed, self._saft_motor.modified_speed))
+#                   + Fore.CYAN + ' :: movement: {}'.format(self._characterise_movement()))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _characterise_movement(self):
-        '''
-        Return a string characterising the robot's movement based on the
-        direction of the port and starboard motors.
-        '''
-        return self._get_movement_description(self.get_mean_speed(Orientation.PORT), self.get_mean_speed(Orientation.STBD))
+#   def _characterise_movement(self):
+#       '''
+#       Return a string characterising the robot's movement based on the
+#       direction of the port and starboard motors.
+#       '''
+#       return self._get_movement_description(self.get_mean_speed(Orientation.PORT), self.get_mean_speed(Orientation.STBD))
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-    def _get_movement_description(self, port_velocity, stbd_velocity):
-        _avg_velocity = ( port_velocity + stbd_velocity ) / 2.0
-        # FIXME use existing methods!
-        if isclose(port_velocity, 0.0, abs_tol=0.5) and isclose(stbd_velocity, 0.0, abs_tol=0.5):
-            # close to stopped
-            return 'stopped'
-        elif isclose(port_velocity, stbd_velocity, abs_tol=0.02):
-            if port_velocity > 0.0:
-                return 'straight ahead'
-            else:
-                return 'straight astern'
-        elif isclose(_avg_velocity, 0.0, abs_tol=0.5):
-            if port_velocity > stbd_velocity:
-                return 'rotate to starboard'
-            elif port_velocity < stbd_velocity:
-                return 'rotate to port'
-            else:
-                return 'indeterminate (0)'
-        elif _avg_velocity > 0.0:
-            if port_velocity > stbd_velocity:
-                return 'turn ahead to starboard'
-            elif port_velocity < stbd_velocity:
-                return 'turn ahead to port'
-            else:
-                return 'ahead indeterminate (1)'
-        elif _avg_velocity < 0.0:
-            if port_velocity > stbd_velocity:
-                return 'turn astern to starboard'
-            elif port_velocity < stbd_velocity:
-                return 'turn astern to port'
-            else:
-                return 'astern indeterminate (2)'
+#   def _get_movement_description(self, port_velocity, stbd_velocity):
+#       _avg_velocity = ( port_velocity + stbd_velocity ) / 2.0
+#       # FIXME use existing methods!
+#       if isclose(port_velocity, 0.0, abs_tol=0.5) and isclose(stbd_velocity, 0.0, abs_tol=0.5):
+#           # close to stopped
+#           return 'stopped'
+#       elif isclose(port_velocity, stbd_velocity, abs_tol=0.02):
+#           if port_velocity > 0.0:
+#               return 'straight ahead'
+#           else:
+#               return 'straight astern'
+#       elif isclose(_avg_velocity, 0.0, abs_tol=0.5):
+#           if port_velocity > stbd_velocity:
+#               return 'rotate to starboard'
+#           elif port_velocity < stbd_velocity:
+#               return 'rotate to port'
+#           else:
+#               return 'indeterminate (0)'
+#       elif _avg_velocity > 0.0:
+#           if port_velocity > stbd_velocity:
+#               return 'turn ahead to starboard'
+#           elif port_velocity < stbd_velocity:
+#               return 'turn ahead to port'
+#           else:
+#               return 'ahead indeterminate (1)'
+#       elif _avg_velocity < 0.0:
+#           if port_velocity > stbd_velocity:
+#               return 'turn astern to starboard'
+#           elif port_velocity < stbd_velocity:
+#               return 'turn astern to port'
+#           else:
+#               return 'astern indeterminate (2)'
 
 #EOF

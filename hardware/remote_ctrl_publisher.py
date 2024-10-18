@@ -14,6 +14,7 @@
 
 import itertools
 import asyncio
+from threading import Timer
 from datetime import datetime as dt
 from colorama import init, Fore, Style
 init()
@@ -50,9 +51,11 @@ class RemoteControlPublisher(Publisher):
         # configuration ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
         self._counter = itertools.count()
         self._pi             = None
+        self._timer          = None
         _cfg = config['mros'].get('publisher').get('remote')
         _loop_freq_hz        = _cfg.get('loop_freq_hz')
         self._publish_delay_sec = 1.0 / _loop_freq_hz
+        self._clear_delay_sec = _cfg.get('clear_delay_sec')
         self._events         = [ Event.REMOTE_A, Event.REMOTE_B, Event.REMOTE_Y, Event.REMOTE_X, Event.REMOTE_D, Event.REMOTE_R, Event.REMOTE_U, Event.REMOTE_L ]
         self._initd          = False
         # pin assignments
@@ -109,16 +112,28 @@ class RemoteControlPublisher(Publisher):
             _index = int('{}{}{}'.format(self._pi.read(self._d2_pin), self._pi.read(self._d1_pin), self._pi.read(self._d0_pin)), 2)
             # when this starts up it will create a zero unrelated to an actual event
             _message = self.message_factory.create_message(self._events[_index], _value)
-            if _index > 0 and _count > 0 and self._last_event.num != _event.num: # throw out initial messages
+#           self._log.info(Style.DIM + 'created message: {}'.format(_message))
+            if _index > 0 and _count > 0 and self._last_event.num != _message.event.num: # throw out initial messages
                 _event = _message.event
                 if _event.num != self._last_event.num:
-                    self._log.info('🍈 remote publish count: {}; index bin: {}; index: {}'.format(_count, _index_bin, _index))
-                    self._log.info(Style.BRIGHT + 'remote-publishing message:' + Fore.WHITE + Style.NORMAL + ' {}'.format(_message.name)
-                            + Fore.CYAN + ' event: {}; '.format(_message.event.name) + Fore.YELLOW + 'timestamp: {}'.format(_message.value))
+#                   self._log.info('remote publish count: {}; index bin: {}; index: {}'.format(_count, _index_bin, _index))
+#                   self._log.info(Style.BRIGHT + 'remote-publishing message:' + Fore.WHITE + Style.NORMAL + ' {}'.format(_message.name)
+#                           + Fore.CYAN + ' event: {}; '.format(_message.event.name) + Fore.YELLOW + 'timestamp: {}'.format(_message.value))
                     await Publisher.publish(self, _message)
+                    pass
                 self._last_event = _event
+#           else:
+#               self._log.info('did not publish message: {}'.format(_message))
             await asyncio.sleep(self._publish_delay_sec)
+            if self._timer:
+                self._timer.cancel()
         self._log.info('remote publish loop complete.')
+
+    def _clear_last_event(self):
+        self._last_event = Event.NOOP
+        if self._timer:
+            self._timer.cancel()
+        self._timer = None
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def poll(self):

@@ -67,6 +67,7 @@ mros:
             i2c_address:                   0x41            # I2C address (default 0x40)
         bno055:
             i2c_device:                       1            # I2C device bus number, equivalent to '/dev/i2c-1'
+            poll_rate_hz:                    20            # polling frequency (Hz)
             mode:                        'NDOF_MODE'       # Acc/Mag/Gyr (see table in BNO055Mode class)
 #           mode:                'NDOF_FMC_OFF_MODE'       # Acc/Mag/Gyr (Fast Mag Calib off)
 #           mode:                     'COMPASS_MODE'       # Acc/Mag no gyro
@@ -78,7 +79,7 @@ mros:
         icm20948:
             i2c_address:                   0x69            # I2C address (default 0x68)
             poll_rate_hz:                   150            # how often the IMU is polled
-            bench_calibrate:               True            # if true, calibrate the IMU manually while on the rotating bench
+            bench_calibrate:              False            # if true, calibrate the IMU manually while on the rotating bench
             motion_calibrate:             False            # if true, calibrate the IMU by the robot rotating in place
             show_console:                  True            # if true, show data on console (same as verbose)
             show_rgbmatrix5x5:             True            # if true, show heading as color
@@ -284,6 +285,7 @@ mros:
             temperature_threshold:           60.0          # alarm over temperature
         remote:
             loop_freq_hz:                    20            # polling loop frequency (Hz)
+            clear_delay_sec:                1.0            # delay before clearing last event in loop (debounce)
             d0_pin:                          22            # GPIO pin for bit 0
             d1_pin:                          27            # GPIO pin for bit 1
             d2_pin:                          17            # GPIO pin for bit 2
@@ -303,7 +305,7 @@ mros:
             bst_pin:                          5            # 2 bumper starboard top (was 2)
             bpb_pin:                          3            # 3 bumper port bottom
             bpt_pin:                          4            # 4 bumper port top
-            fop_pin:                          7            # 7 fore oblique port IR distance sensor
+            fop_pin:                          9            # was: 7 fore oblique port IR distance sensor
             fos_pin:                          8            # 8 fore oblique starboard IR distance sensor
             wsa_pin:                         11            # 11 wheel starboard aft
             wsf_pin:                         12            # 12 wheel starboard fore

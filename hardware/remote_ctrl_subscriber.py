@@ -56,10 +56,18 @@ class RemoteControlSubscriber(Subscriber):
         # configuration ................
         _cfg = config['mros'].get('subscriber').get('remote')
         self._play_sound = _cfg.get('play_sound')
+        self._component_registry = globals.get('component-registry')
+        if self._component_registry is None:
+            raise Exception('no component registry available.')
+        self._motor_configurer = self._component_registry.get('motor-config')
+        if self._motor_configurer is None:
+            raise Exception('no motor configurer available.')
+        self._screen = self._component_registry.get('screen')
+        self._status_light = self._component_registry.get('indicator')
         self._mros = globals.get('mros')
         if self._mros is None:
-            raise Exception('mros not set in globals.')
-        self._last_event = None
+            self._log.warning('mros not set in globals.')
+        self._last_event = Event.NOOP
         self._player = Player.instance()
         self._clear()
         self._log.info('ready.')
@@ -102,34 +110,34 @@ class RemoteControlSubscriber(Subscriber):
         _event = message.event
         self._log.debug('pre-processing message {}; '.format(message.name) + Fore.YELLOW + ' event: {}'.format(_event.name))
         _value = message.value
-        if _event.num != self._last_event:
-            if _event.num == Event.REMOTE_A.num:
-                self._remote_A(_value)
-                self.play_sound(Sound.CHATTER_2)
-            elif _event.num == Event.REMOTE_B.num:
-                self._remote_B(_value)
-                self.play_sound(Sound.CHATTER_3)
-            elif _event.num == Event.REMOTE_Y.num:
-                self._remote_Y(_value)
-                self.play_sound(Sound.CHATTER_4)
-            elif _event.num == Event.REMOTE_X.num:
-                self._remote_X(_value)
-                self.play_sound(Sound.TELEMETRY)
-            elif _event.num == Event.REMOTE_D.num:
-                self._remote_D(_value)
-                self.play_sound(Sound.CHIRP_1)
-            elif _event.num == Event.REMOTE_R.num:
-                self._remote_R(_value)
-                self.play_sound(Sound.CHATTER_1)
-            elif _event.num == Event.REMOTE_U.num:
-                self._remote_U(_value)
-                self.play_sound(Sound.CHIRP_2)
-            elif _event.num == Event.REMOTE_L.num:
-                self._remote_L(_value)
-                self.play_sound(Sound.CHATTER_5)
-            else:
-                self._log.warning('unrecognised RGB event on message {}'.format(message.name) + ''.format(message.event.name))
-        self._last_event = _event.num
+#       if _event.num != self._last_event:
+        if _event.num == Event.REMOTE_A.num:
+            self._remote_A(_value)
+            self.play_sound(Sound.CHATTER_2)
+        elif _event.num == Event.REMOTE_B.num:
+            self._remote_B(_value)
+            self.play_sound(Sound.CHATTER_3)
+        elif _event.num == Event.REMOTE_Y.num:
+            self._remote_Y(_value)
+            self.play_sound(Sound.CHATTER_4)
+        elif _event.num == Event.REMOTE_X.num:
+            self._remote_X(_value)
+            self.play_sound(Sound.TELEMETRY)
+        elif _event.num == Event.REMOTE_D.num:
+            self._remote_D(_value)
+            self.play_sound(Sound.CHIRP_1)
+        elif _event.num == Event.REMOTE_R.num:
+            self._remote_R(_value)
+            self.play_sound(Sound.CHATTER_1)
+        elif _event.num == Event.REMOTE_U.num:
+            self._remote_U(_value)
+            self.play_sound(Sound.CHIRP_2)
+        elif _event.num == Event.REMOTE_L.num:
+            self._remote_L(_value)
+            self.play_sound(Sound.CHATTER_5)
+        else:
+            self._log.warning('unrecognised RGB event on message {}'.format(message.name) + ''.format(message.event.name))
+#       self._last_event = _event.num
         await Subscriber.process_message(self, message)
         self._log.debug('post-processing message {}'.format(message.name))
 
@@ -175,7 +183,8 @@ class RemoteControlSubscriber(Subscriber):
         print(Fore.MAGENTA + Style.BRIGHT + "3. X message: '{}'".format(value))
         self._set_color(Color.CYAN)
         # TODO send Event.SHUTDOWN
-        self._mros.shutdown()
+        if self._mros:
+            self._mros.shutdown()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _remote_D(self, value):
@@ -210,17 +219,14 @@ class RemoteControlSubscriber(Subscriber):
         self._set_color(Color.RED)
 
     # actions ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
-   
+
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def startup(self):
-        _motor_configurer = self._mros.get_motor_configurer()
-        _motor_configurer.set_thunderborg_leds(False)
-        _screen = self._mros.get_screen()
-        if _screen:
-            _screen.disable() 
-        _status_light = self._mros.get_status_light()
-        if _status_light:
-            _status_light.enable()
+        self._motor_configurer.set_thunderborg_leds(False)
+        if self._screen:
+            self._screen.disable()
+        if self._status_light:
+            self._status_light.enable()
 
     # ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
     def _clear(self, show=True):
