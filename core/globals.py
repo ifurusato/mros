@@ -1,16 +1,14 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2020-2024 by Murray Altheim. All rights reserved. This file is part
+# Copyright 2020-2025 by Murray Altheim. All rights reserved. This file is part
 # of the Robot Operating System project, released under the MIT License. Please
 # see the LICENSE file included as part of this package.
 #
 # author:   Murray Altheim
 # created:  2021-09-03
-# modified: 2021-09-03
-#
+# modified: 2025-06-27
 
-# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def init():
     '''
     Creates an application-global dictionary as a way to share objects across
@@ -28,8 +26,8 @@ def init():
     for consistency and to clearly differentiate between actual variable
     names we are using dashes as delimiters within variable names.
 
-    Note that you should only need to call 'globals.init()' on your first
-    module access or your main() method.
+    Note that you only need to call 'globals.init()' on your first module
+    access or your main() method.
     '''
     global gvars
     try:
@@ -38,7 +36,6 @@ def init():
     except Exception as e:
         gvars = {}
 
-# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def has(key):
     global gvars
     if gvars:
@@ -46,26 +43,16 @@ def has(key):
     else:
         return False
 
-# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def put(key, value):
     global gvars
     if not gvars:
         init()
     gvars[key] = value
 
-# ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
 def get(key):
     global gvars
     if not gvars:
         return None
     return gvars.get(key)
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-class GlobalsError(Exception):
-    '''
-    This exception is thrown when any error occurs while referencing or
-    otherwise processing global variables.
-    '''
-    pass
 
 #EOF
