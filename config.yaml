@@ -112,7 +112,7 @@ mros:
             font_name:      'Varela-Regular.ttf'           # font family
         gamepad:
             enabled:                       True
-            device_path:     '/dev/input/event9'           # the path to the bluetooth gamepad on the pi (see find_gamepad.py)
+            device_path:     '/dev/input/event7'           # the path to the bluetooth gamepad on the pi (see find_gamepad.py)
             loop_delay:                       0.01         # main loop delay was sleep(0.01) or 1/100th second, or 10ms. 50ms is the delay for 20Hz, so 10ms is 5x 20Hz or 100Hz.
             suppress_horiz_events:         True            # ignore horizontal joystick events
             loop_freq_hz:                   100            # polling loop frequency (Hz)
